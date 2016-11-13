@@ -45,6 +45,7 @@ bool OrderByExecutor::DInit() {
 }
 
 bool OrderByExecutor::DExecute() {
+  size_t rows_added = 0;
   LOG_TRACE("Order By executor ");
 
   if (!sort_done_) DoSort();
@@ -59,34 +60,37 @@ bool OrderByExecutor::DExecute() {
 
   // Returned tiles must be newly created physical tiles,
   // which have the same physical schema as input tiles.
-  size_t tile_size = std::min(size_t(DEFAULT_TUPLES_PER_TILEGROUP),
-                              sort_buffer_.size() - num_tuples_returned_);
-
   std::shared_ptr<storage::Tile> ptile(storage::TileFactory::GetTile(
       BACKEND_TYPE_MM, INVALID_OID, INVALID_OID, INVALID_OID, INVALID_OID,
-      nullptr, *input_schema_, nullptr, tile_size));
+      nullptr, *input_schema_, nullptr, output_tile_size_));
 
-  for (size_t id = 0; id < tile_size; id++) {
-    oid_t source_tile_id =
-        sort_buffer_[num_tuples_returned_ + id].item_pointer.block;
-    oid_t source_tuple_id =
-        sort_buffer_[num_tuples_returned_ + id].item_pointer.offset;
-    // Insert a physical tuple into physical tile
-    for (oid_t col = 0; col < input_schema_->GetColumnCount(); col++) {
-      common::Value val = (
-          input_tiles_[source_tile_id]->GetValue(source_tuple_id, col));
-      ptile.get()->SetValue(val, id, col);
+  for (size_t id = 0; id < output_tile_size_; id++) {
+    // overflow guard
+    if (num_tuples_returned_ + id < sort_buffer_.size()) {
+      oid_t source_tile_id =
+          sort_buffer_[num_tuples_returned_ + id].item_pointer.block;
+      oid_t source_tuple_id =
+          sort_buffer_[num_tuples_returned_ + id].item_pointer.offset;
+      // Insert a physical tuple into physical tile
+      for (oid_t col = 0; col < input_schema_->GetColumnCount(); col++) {
+        common::Value val = (
+            input_tiles_[source_tile_id]->GetValue(source_tuple_id, col));
+        ptile.get()->SetValue(val, id, col);
+      }
+      rows_added++;
     }
   }
 
   // Create an owner wrapper of this physical tile
   std::vector<std::shared_ptr<storage::Tile>> singleton({ptile});
   std::unique_ptr<LogicalTile> ltile(LogicalTileFactory::WrapTiles(singleton));
-  PL_ASSERT(ltile->GetTupleCount() == tile_size);
+
+  LOG_DEBUG("gtc:%ld ots:%ld ra:%ld", ltile->GetTupleCount(), output_tile_size_, rows_added);
+  PL_ASSERT(ltile->GetTupleCount() <= output_tile_size_);
 
   SetOutput(ltile.release());
 
-  num_tuples_returned_ += tile_size;
+  num_tuples_returned_ += rows_added;
 
   PL_ASSERT(num_tuples_returned_ <= sort_buffer_.size());
 
@@ -190,6 +194,12 @@ bool OrderByExecutor::DoSort() {
       [&comp](const sort_buffer_entry_t &a, const sort_buffer_entry_t &b) {
         return comp(a.tuple.get(), b.tuple.get());
       });
+
+  /* Choose system default or give approximately equal number of
+   * tuples to each tile
+   */
+  output_tile_size_ = std::min(size_t(DEFAULT_TUPLES_PER_TILEGROUP),
+                               (sort_buffer_.size() + input_tiles_.size() - 1)/input_tiles_.size());
 
   sort_done_ = true;
 
