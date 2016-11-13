@@ -86,6 +86,9 @@ class OrderByExecutor : public AbstractExecutor {
   /** All valid tuples in sorted order */
   std::vector<sort_buffer_entry_t> sort_buffer_;
 
+  /** Size of each tile returned after sorting **/
+  size_t output_tile_size_;
+
   /** Tuples in sort_buffer only contains the sort keys */
   std::unique_ptr<catalog::Schema> sort_key_tuple_schema_;
 
