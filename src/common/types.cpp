@@ -750,6 +750,9 @@ std::string PlanNodeTypeToString(PlanNodeType type) {
     case PLAN_NODE_TYPE_MERGEJOIN: {
       return ("MERGEJOIN");
     }
+    case PLAN_NODE_TYPE_SORT_MERGEJOIN: {
+      return "SORTMERGEJOIN";
+    }
     case PLAN_NODE_TYPE_HASHJOIN: {
       return ("HASHJOIN");
     }
