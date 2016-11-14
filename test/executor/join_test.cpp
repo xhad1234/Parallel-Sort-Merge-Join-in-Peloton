@@ -529,8 +529,15 @@ void ExecuteJoinTest(PlanNodeType join_algorithm, PelotonJoinType join_type,
     ExpectEmptyTileResult(&left_table_scan_executor);
   } else if (join_test_type == RIGHT_TABLE_EMPTY) {
     if (join_type == JOIN_TYPE_INNER || join_type == JOIN_TYPE_RIGHT) {
-      ExpectMoreThanOneTileResults(&left_table_scan_executor,
-                                   left_table_logical_tile_ptrs);
+      // for sort-merge join, sort the table from the left child
+      if (join_algorithm == PLAN_NODE_TYPE_SORT_MERGEJOIN) {
+        ExpectNormalTileResults(left_table_tile_group_count,
+                                &left_table_scan_executor,
+                                left_table_logical_tile_ptrs);
+      } else {
+        ExpectMoreThanOneTileResults(&left_table_scan_executor,
+                                     left_table_logical_tile_ptrs);
+      }
     } else {
       ExpectNormalTileResults(left_table_tile_group_count,
                               &left_table_scan_executor,
@@ -556,7 +563,9 @@ void ExecuteJoinTest(PlanNodeType join_algorithm, PelotonJoinType join_type,
   } else if (join_test_type == LEFT_TABLE_EMPTY) {
     if (join_type == JOIN_TYPE_INNER || join_type == JOIN_TYPE_LEFT) {
       // For hash join, we always build the hash table from right child
-      if (join_algorithm == PLAN_NODE_TYPE_HASHJOIN) {
+      // For sort merge join, the right child is sorted
+      if (join_algorithm == PLAN_NODE_TYPE_HASHJOIN ||
+          join_algorithm == PLAN_NODE_TYPE_SORT_MERGEJOIN) {
         ExpectNormalTileResults(right_table_tile_group_count,
                                 &right_table_scan_executor,
                                 right_table_logical_tile_ptrs);
