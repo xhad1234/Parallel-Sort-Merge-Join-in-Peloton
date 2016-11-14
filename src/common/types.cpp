@@ -579,6 +579,7 @@ std::string PlanNodeTypeToString(PlanNodeType type) {
     case PLAN_NODE_TYPE_NESTLOOP: { return "NESTLOOP"; }
     case PLAN_NODE_TYPE_NESTLOOPINDEX: { return "NESTLOOPINDEX"; }
     case PLAN_NODE_TYPE_MERGEJOIN: { return "MERGEJOIN"; }
+    case PLAN_NODE_TYPE_SORT_MERGEJOIN: { return "SORTMERGEJOIN";}
     case PLAN_NODE_TYPE_HASHJOIN: { return "HASHJOIN"; }
     case PLAN_NODE_TYPE_UPDATE: { return "UPDATE"; }
     case PLAN_NODE_TYPE_INSERT: { return "INSERT"; }

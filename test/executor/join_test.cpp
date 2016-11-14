@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include <memory>
+#include <include/planner/order_by_plan.h>
 
 #include "common/harness.h"
 
@@ -31,6 +32,8 @@
 #include "planner/hash_plan.h"
 #include "planner/merge_join_plan.h"
 #include "planner/nested_loop_join_plan.h"
+#include "planner/order_by_plan.h"
+
 
 #include "storage/data_table.h"
 #include "storage/tile.h"
@@ -40,6 +43,7 @@
 #include "executor/mock_executor.h"
 #include "executor/executor_tests_util.h"
 #include "executor/join_tests_util.h"
+#include "executor/order_by_executor.h"
 
 using ::testing::NotNull;
 using ::testing::Return;
@@ -70,7 +74,8 @@ std::shared_ptr<const peloton::catalog::Schema> CreateJoinSchema() {
 }
 
 std::vector<PlanNodeType> join_algorithms = {
-    PLAN_NODE_TYPE_NESTLOOP, PLAN_NODE_TYPE_MERGEJOIN, PLAN_NODE_TYPE_HASHJOIN};
+    PLAN_NODE_TYPE_NESTLOOP, PLAN_NODE_TYPE_MERGEJOIN, PLAN_NODE_TYPE_HASHJOIN,
+    PLAN_NODE_TYPE_SORT_MERGEJOIN};
 
 std::vector<PelotonJoinType> join_types = {JOIN_TYPE_INNER, JOIN_TYPE_LEFT,
                                            JOIN_TYPE_RIGHT, JOIN_TYPE_OUTER};
@@ -205,6 +210,8 @@ TEST_F(JoinTests, SpeedTest) {
   ExecuteJoinTest(PLAN_NODE_TYPE_MERGEJOIN, JOIN_TYPE_OUTER, SPEED_TEST);
 
   ExecuteJoinTest(PLAN_NODE_TYPE_NESTLOOP, JOIN_TYPE_OUTER, SPEED_TEST);
+
+  ExecuteJoinTest(PLAN_NODE_TYPE_SORT_MERGEJOIN, JOIN_TYPE_OUTER, SPEED_TEST);
 }
 
 void ExecuteJoinTest(PlanNodeType join_algorithm, PelotonJoinType join_type,
@@ -443,6 +450,64 @@ void ExecuteJoinTest(PlanNodeType join_algorithm, PelotonJoinType join_type,
         }
       }
 
+    } break;
+
+    case PLAN_NODE_TYPE_SORT_MERGEJOIN: {
+      // create the order by plan
+      std::vector<oid_t> sort_keys({1});
+      std::vector<bool> descend_flags({false});
+      std::vector<oid_t> output_columns({0, 1, 2, 3});
+
+      planner::OrderByPlan left_order_node(sort_keys, descend_flags,
+                                           output_columns);
+      planner::OrderByPlan right_order_node(sort_keys, descend_flags,
+                                            output_columns);
+
+      std::unique_ptr<executor::ExecutorContext> left_order_context(
+          new executor::ExecutorContext(nullptr));
+      std::unique_ptr<executor::ExecutorContext> right_order_context(
+          new executor::ExecutorContext(nullptr));
+
+      // Create and set up the order by executor
+      executor::OrderByExecutor left_order_executor(&left_order_node,
+                                                    left_order_context.get());
+
+      executor::OrderByExecutor right_order_executor(&right_order_node,
+                                                     right_order_context.get());
+
+      // Create join clauses
+      std::vector<planner::MergeJoinPlan::JoinClause> join_clauses;
+      join_clauses = CreateJoinClauses();
+      // Create merge join plan node
+      planner::MergeJoinPlan merge_join_node(join_type, std::move(predicate),
+                                             std::move(projection), schema,
+                                             join_clauses);
+      // Construct the merge join executor
+      executor::MergeJoinExecutor merge_join_executor(&merge_join_node,
+                                                      nullptr);
+
+      // sort both input tables
+      left_order_executor.AddChild(&left_table_scan_executor);
+      right_order_executor.AddChild(&right_table_scan_executor);
+
+      // then merge their outputs in lockstep
+      merge_join_executor.AddChild(&left_order_executor);
+      merge_join_executor.AddChild(&right_order_executor);
+
+      // Run the merge join executor
+      EXPECT_TRUE(merge_join_executor.Init());
+      while (merge_join_executor.Execute() == true) {
+        std::unique_ptr<executor::LogicalTile> result_logical_tile(
+            merge_join_executor.GetOutput());
+
+        if (result_logical_tile != nullptr) {
+          result_tuple_count += result_logical_tile->GetTupleCount();
+          tuples_with_null +=
+              CountTuplesWithNullFields(result_logical_tile.get());
+          ValidateJoinLogicalTile(result_logical_tile.get());
+          LOG_TRACE("%s", result_logical_tile->GetInfo().c_str());
+        }
+      }
     } break;
 
     case PLAN_NODE_TYPE_HASHJOIN: {

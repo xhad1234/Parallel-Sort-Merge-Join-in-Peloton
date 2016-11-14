@@ -58,6 +58,7 @@ bool OrderByExecutor::DExecute() {
   PL_ASSERT(input_schema_.get());
   PL_ASSERT(input_tiles_.size() > 0);
 
+
   // Returned tiles must be newly created physical tiles,
   // which have the same physical schema as input tiles.
   std::shared_ptr<storage::Tile> ptile(storage::TileFactory::GetTile(
