@@ -28,7 +28,11 @@
     <div id="content-wrapper">
       <div class="inner clearfix">
         <section id="main-content">
-          <h3>
+          <p>Currently we are implementing the SIMD sort. Because it is independent from peloton, we put the current code in a different repository: [avx2-merge-sort]（<a href="https://github.com/sid1607/avx2-merge-sort%EF%BC%89">https://github.com/sid1607/avx2-merge-sort）</a></p>
+
+<hr>
+
+<h3>
 <a id="summary" class="anchor" href="#summary" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Summary</h3>
 
 <p>The objective is to implement the Sort-Merge Join operator into the Peloton in-memory database system made by <a href="https://github.com/cmu-db/peloton">CMUDB</a>. Recent database literature have designed various hardware-aware Sort-Merge join approaches that involve cache-conscious sorting mechanisms and NUMA-aware work decomposition schemes. We will incorporate these designs in the operator we build for Peloton and evaluate the performance gains and hardware utilization that these techniques have to offer.</p>
