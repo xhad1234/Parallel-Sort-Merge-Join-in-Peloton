@@ -90,22 +90,98 @@
 <h2>
 <a id="revised-schedule" class="anchor" href="#revised-schedule" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Revised Schedule</h2>
 
-<p>Make sure your project schedule on your main project page is up to date with work completed so far, and well as with a revised plan of work for the coming weeks. As by this time you should have a good understanding of what is required to complete your project, I want to see a very detailed schedule for the coming weeks. I suggest breaking time down into half-week increments. Each increment should have at least one task, and for each task put a person's name on it.</p>
+<table>
+<thead>
+<tr>
+<th>Week Number</th>
+<th>Tasks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji> Implement a sequential merge-sort join mechanism for Peloton</td>
+</tr>
+<tr>
+<td>2</td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji> Design and implement the SIMD version merge-sort</td>
+</tr>
+<tr>
+<td>3</td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji> Finish the SIMD version merge-sort</td>
+</tr>
+<tr>
+<td></td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji> Testing the SIMD version merge-sort</td>
+</tr>
+<tr>
+<td>4-1</td>
+<td>(Sid) Support sorting of all elements number</td>
+</tr>
+<tr>
+<td></td>
+<td>(Lei) Micro benchmark on Haswell Machine to compare std vs SIMD sort</td>
+</tr>
+<tr>
+<td>4-2</td>
+<td>(Sid) Explore 16*16 bitonic merge</td>
+</tr>
+<tr>
+<td></td>
+<td>(Lei) Compare with 4-fold network</td>
+</tr>
+<tr>
+<td>5-1</td>
+<td>(Sid) AVX2 compile with Peloton</td>
+</tr>
+<tr>
+<td></td>
+<td>(Lei) Merge the SIMD sort in Peloton</td>
+</tr>
+<tr>
+<td>5-2</td>
+<td>(Sid &amp; Lei) Figure out how to maintain the reference of tuple</td>
+</tr>
+<tr>
+<td>6-1</td>
+<td>(Sid &amp; Lei) Performance evaluation</td>
+</tr>
+<tr>
+<td></td>
+<td>(Sid &amp; Lei) Non-SIMD vs SIMD sort version in peloton</td>
+</tr>
+<tr>
+<td>6-2</td>
+<td>Prepare for the document and poster</td>
+</tr>
+</tbody>
+</table>
 
 <h2>
 <a id="work-completed" class="anchor" href="#work-completed" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Work Completed</h2>
 
-<p>One to two paragraphs, summarize the work that you have completed so far. (This should be easy if you have been maintaining this information on your project page.)</p>
+<h3>
+<a id="sequential-merge-sort-join" class="anchor" href="#sequential-merge-sort-join" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Sequential Merge-Sort Join</h3>
+
+<h3>
+<a id="sorting-network" class="anchor" href="#sorting-network" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Sorting Network</h3>
+
+<h3>
+<a id="bitonic-sort" class="anchor" href="#bitonic-sort" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Bitonic Sort</h3>
 
 <h2>
 <a id="process" class="anchor" href="#process" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Process</h2>
 
-<p>Describe how you are doing with respect to the goals and deliverables stated in your proposal. Do you still believe you will be able to produce all your deliverables? If not, why? What about the "nice to haves"? In your checkpoint writeup we want a new list of goals that you plan to hit for the poster session.</p>
+<p>The process goes as the plan in proposal. By the end of week three, we have finished the minimum goal: implementation of the logistic of the SIMD version merge-sort. We are now focusing on expanding the functionality and conducting performance tests for our SIMD merge-sort. After that, we will deploy the merge sort in Peloton and reach our major goal. </p>
 
 <h2>
 <a id="poster-session-plan" class="anchor" href="#poster-session-plan" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Poster Session Plan</h2>
 
-<p>What do you plan to show at the poster session? Will it be a demo? Will it be a graph?</p>
+<p>We can show a simple demo by performing our merge-sort in peloton. In the meantime, we will use graph and charts to show   the performance of our implementation.</p>
 
 <h2>
 <a id="issues" class="anchor" href="#issues" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Issues</h2>
@@ -116,6 +192,10 @@
 <a id="authors-and-contributors" class="anchor" href="#authors-and-contributors" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Authors and Contributors</h2>
 
 <p>The project is planed to be done evenly by Siddharth Santurkar (<a href="https://github.com/sid1607" class="user-mention">@sid1607</a>) and Lei Qi (<a href="https://github.com/xhad1234" class="user-mention">@xhad1234</a>).</p>
+
+<hr>
+
+<hr>
 
       <footer class="site-footer">
         <span class="site-footer-owner"><a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton">Parallel Sort Merge Join in Peloton</a> is maintained by <a href="https://github.com/xhad1234">xhad1234</a>.</span>
