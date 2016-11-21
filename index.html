@@ -1,25 +1,34 @@
 <!DOCTYPE html>
-<html lang="en-us">
+<html>
   <head>
-    <meta charset="UTF-8">
-    <title>Parallel Sort Merge Join in Peloton by xhad1234</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
-    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
     <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
-  </head>
-  <body>
-    <section class="page-header">
-      <h1 class="project-name">Parallel Sort Merge Join in Peloton</h1>
-      <h2 class="project-tagline">The Self-Driving Database Management System</h2>
-      <a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton" class="btn">View on GitHub</a>
-      <a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton/zipball/master" class="btn">Download .zip</a>
-      <a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton/tarball/master" class="btn">Download .tar.gz</a>
-    </section>
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
 
-    <section class="main-content">
-      <p>Currently we are implementing the SIMD sort. Because it is independent from peloton, we put the current code in a different repository: <a href="https://github.com/sid1607/avx2-merge-sort">avx2-merge-sort</a></p>
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <title>Parallel Sort Merge Join in Peloton by xhad1234</title>
+  </head>
+
+  <body>
+    <header>
+      <div class="inner">
+        <h1>Parallel Sort Merge Join in Peloton</h1>
+        <h2>The Self-Driving Database Management System</h2>
+        <a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton" class="button"><small>View project on</small> GitHub</a>
+      </div>
+    </header>
+
+    <div id="content-wrapper">
+      <div class="inner clearfix">
+        <section id="main-content">
+          <p>Currently we are implementing the SIMD sort. Because it is independent from peloton, we put the current code in a different repository: <a href="https://github.com/sid1607/avx2-merge-sort">avx2-merge-sort</a></p>
 
 <hr>
 
@@ -161,6 +170,8 @@
 </tbody>
 </table>
 
+<p><img src="https://www.dropbox.com/s/pf5ded1roqv42vu/Screenshot%202016-11-21%2003.35.27.png?dl=0" alt=""></p>
+
 <h2>
 <a id="work-completed" class="anchor" href="#work-completed" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Work Completed</h2>
 
@@ -169,6 +180,8 @@
 
 <h3>
 <a id="sorting-network" class="anchor" href="#sorting-network" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Sorting Network</h3>
+
+<p><a href="https://www.dropbox.com/s/pf5ded1roqv42vu/Screenshot%202016-11-21%2003.35.27.png?dl=0">https://www.dropbox.com/s/pf5ded1roqv42vu/Screenshot%202016-11-21%2003.35.27.png?dl=0</a></p>
 
 <h3>
 <a id="bitonic-sort" class="anchor" href="#bitonic-sort" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Bitonic Sort</h3>
@@ -181,12 +194,15 @@
 <h2>
 <a id="poster-session-plan" class="anchor" href="#poster-session-plan" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Poster Session Plan</h2>
 
-<p>We can show a simple demo by performing our merge-sort in peloton. In the meantime, we will use graph and charts to show   the performance of our implementation.</p>
+<p>We can show a simple demo by performing our merge-sort in peloton. In the meantime, we will use graph and charts to show the performance of our implementation.</p>
 
 <h2>
 <a id="issues" class="anchor" href="#issues" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Issues</h2>
 
-<p>List the issues that concern you the most. Are there any remaining unknowns (things you simply don't know how to solve, or resource you don't know how to get) or is it just a matter of coding and doing the work? If you do not wish to put this information on a public web site you are welcome to email the staff directly.</p>
+<ul>
+<li>Peloton uses tuple to store data, we need to figure out how to maintain the reference of tuple while doing sort.</li>
+<li>Currently our methods only support array lengths which are times of 64</li>
+</ul>
 
 <h2>
 <a id="authors-and-contributors" class="anchor" href="#authors-and-contributors" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Authors and Contributors</h2>
@@ -196,14 +212,24 @@
 <hr>
 
 <hr>
+        </section>
 
-      <footer class="site-footer">
-        <span class="site-footer-owner"><a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton">Parallel Sort Merge Join in Peloton</a> is maintained by <a href="https://github.com/xhad1234">xhad1234</a>.</span>
+        <aside id="sidebar">
+          <a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton/zipball/master" class="button">
+            <small>Download</small>
+            .zip file
+          </a>
+          <a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton/tarball/master" class="button">
+            <small>Download</small>
+            .tar.gz file
+          </a>
 
-        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
-      </footer>
+          <p class="repo-owner"><a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton"></a> is maintained by <a href="https://github.com/xhad1234">xhad1234</a>.</p>
 
-    </section>
+          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
+        </aside>
+      </div>
+    </div>
 
   
   </body>
