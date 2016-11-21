@@ -28,17 +28,20 @@
     <div id="content-wrapper">
       <div class="inner clearfix">
         <section id="main-content">
-          <p>Currently we are implementing the SIMD sort. Because it is independent from peloton, we put the current code in a different repository: [avx2-merge-sort]（<a href="https://github.com/sid1607/avx2-merge-sort%EF%BC%89">https://github.com/sid1607/avx2-merge-sort）</a></p>
+          <p>Currently we are implementing the SIMD sort. Because it is independent from peloton, we put the current code in a different repository: <a href="https://github.com/sid1607/avx2-merge-sort">avx2-merge-sort</a></p>
 
 <hr>
 
-<h3>
-<a id="summary" class="anchor" href="#summary" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Summary</h3>
+<h1>
+<a id="proposal" class="anchor" href="#proposal" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Proposal</h1>
+
+<h2>
+<a id="summary" class="anchor" href="#summary" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Summary</h2>
 
 <p>The objective is to implement the Sort-Merge Join operator into the Peloton in-memory database system made by <a href="https://github.com/cmu-db/peloton">CMUDB</a>. Recent database literature have designed various hardware-aware Sort-Merge join approaches that involve cache-conscious sorting mechanisms and NUMA-aware work decomposition schemes. We will incorporate these designs in the operator we build for Peloton and evaluate the performance gains and hardware utilization that these techniques have to offer.</p>
 
-<h3>
-<a id="background" class="anchor" href="#background" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Background</h3>
+<h2>
+<a id="background" class="anchor" href="#background" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Background</h2>
 
 <p>Peloton is an in-memory database project that is developed by the CMU Database Group based on the RDBMS model with ACID guarantees. Since this system does not use the disk for storing and retrieving data, it needs to address bottlenecks associated with the memory hierarchy (caches), memory access patterns, concurrency control across multiple cores in order to utilize the available hardware effectively. Peloton, being a HTAP (Hybrid Transaction Processing) system, should be capable of handling both OLTP and OLAP workloads. OLAP involves long running queries that operate on large volumes of data across multiple relations. Joins are in important class of operators for OLAP workloads and OLAP joins have good scope for parallelization since they work on large volumes of data in memory. This approach to database parallelism is known as &gt; intra-query parallelism. Presently, Peloton does not support intra-query parallelism for any class of queries. Based on the relevance to what we learnt from this course and the approaches followed by existing database literature, we chose to work with sort-merge join.</p>
 
@@ -52,13 +55,13 @@
 
 <p>The biggest challenger for parallelization is the sort phase since there are a lot of data dependencies in all sorting algorithms. The work done in Oracle and Intel's "Fast Join Implementation on Modern Multi-core CPUS" and  ETH's "new optimization and results for radix hash join" use a cache-conscious approach for the sort phase. These approaches implement merge sort and apply a different implementation for merge sort depending on the level in the memory hierarchy. For register-level and cache-level sorting, these papers claim that using SIMD is important to achieve good speedup and hardware efficiency. The work done in Hyper claims that SIMD-based sorting isn't necessary to achieve good performance and processor scalability for sort-merge join. They propose a NUMA-aware implementation that incurs the partitioning phase to chunk the input relations across NUMA-sockets, produces core-local sorted runs of these chunks and applies the join predicate for each chunk of the first relation against all chunks of the second relation. The rationale for this approach is that complete traversal of the second relation's chunks will not happen for any given first chunk, since they are already sorted. They also state that the memory prefetcher can mask the interconnect latency when sequential access is carried out on non-local sockets. Our project would be focussed towards integrating the key ideas introduced by these approaches - using a SIMD-based low-level sorting implementation and NUMA-aware data partitioning and evaluating the performance and scalability of our implementation as we add these features</p>
 
-<h3>
-<a id="the-challenge" class="anchor" href="#the-challenge" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>The Challenge</h3>
+<h2>
+<a id="the-challenge" class="anchor" href="#the-challenge" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>The Challenge</h2>
 
 <p>We will be using AVX2 CPU intrinsics to implement cache-conscious sorting with SIMD. Since AVX2 offers low-level primitives it will be fairly complicated to implement a fully-functioning sorting network. We also need to be careful about the type of AVX2 instructions we use; an implementation with unnecessary calls to gather and scatter can limit the performance of the implementation. The workload involves two large relations that need to be sorted, which inherently comes with a high communication-to-computation ratio, since large tables will certainly not fit a single memory region. Since sorting is an operation that attempts to establish global order across distributed elements, reducing and optimization the communication patterns would be the primary challenge. None of the papers discussed in the previous section have a perfect solution for this. Instead, they rely on data access patterns and instructional similarity in some operations of join to make better utilization of the hardware.</p>
 
-<h3>
-<a id="resource" class="anchor" href="#resource" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Resource</h3>
+<h2>
+<a id="resource" class="anchor" href="#resource" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Resource</h2>
 
 <p>We are working based on the code base of  the CMU in-memory DBMS project Peloton. For SIMD merge-sort method, we plan to refer to the oracle and intel's sort merge work </p>
 
@@ -80,8 +83,8 @@
 
 <p>The parallel data lab provides PDL clusters for us to do the evaluation. There are nodes of NUMA architecture inside so as we can test the numa-aware implementation based on that.  Also, we plan to use TPC-h benchmark to compare the scalabilities among the non-paralel , non-NUMA-aware SIMD and NUMA-aware versions of peloton.</p>
 
-<h3>
-<a id="goal-and-deliverables" class="anchor" href="#goal-and-deliverables" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Goal and Deliverables</h3>
+<h2>
+<a id="goal-and-deliverables" class="anchor" href="#goal-and-deliverables" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Goal and Deliverables</h2>
 
 <ul>
 <li><p>Minimum Goal: We set the minimum goal as the implementation of the logistic of the SIMD version merge-sort, together with a thorough performance analysis for that. We don't expect scalability for the minimum goal. The deliverable for this goal includes a consistent and runnable SIMD merge-join mechanism for peloton, and a report comparing and analysing of the performance among the sequential and parallel version. We expect a B score for reaching minimum goal. </p></li>
@@ -89,13 +92,21 @@
 <li><p>Stretch Goal: We have two stretch goals. The first stretch goal is to implement a NUMA-aware merge-sort join mechanism together with the evaluation showing the benefit gained from that. The second stretch goal is to implement the radix hash join partitioning method to get further performance improvement. The deliverable for this phase is the implementation together with an evaluation based on machine with NUMA architecture. We expect an A+ for accomplish either of the stretch goals.</p></li>
 </ul>
 
-<h3>
-<a id="platform-choice" class="anchor" href="#platform-choice" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Platform Choice</h3>
+<h2>
+<a id="platform-choice" class="anchor" href="#platform-choice" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Platform Choice</h2>
 
 <p>We use PDL cluster as the evaluation machine because it provides NUMA node. We choose C++ as the programming language since it has SIMD lib and it is the language of Peloton.</p>
 
-<h3>
-<a id="authors-and-contributors" class="anchor" href="#authors-and-contributors" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Authors and Contributors</h3>
+<hr>
+
+<h1>
+<a id="project-checkpoint" class="anchor" href="#project-checkpoint" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Project Checkpoint</h1>
+
+<h2>
+<a id="updated" class="anchor" href="#updated" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Updated</h2>
+
+<h2>
+<a id="authors-and-contributors" class="anchor" href="#authors-and-contributors" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Authors and Contributors</h2>
 
 <p>The project is planed to be done evenly by Siddharth Santurkar (<a href="https://github.com/sid1607" class="user-mention">@sid1607</a>) and Lei Qi (<a href="https://github.com/xhad1234" class="user-mention">@xhad1234</a>).</p>
         </section>
