@@ -178,16 +178,44 @@
 <h3>
 <a id="sequential-merge-sort-join" class="anchor" href="#sequential-merge-sort-join" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Sequential Merge-Sort Join</h3>
 
+<p>In Peloton's plan tree, a merge-sort join could be represented as a merge-sort-join node. Each child node of it is a Merge-sort operator, which returns one tier at each call. The merge-sort join operator call the sorting operator of both sides accordingly and generate the final result.</p>
+
 <h3>
 <a id="sorting-network" class="anchor" href="#sorting-network" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Sorting Network</h3>
 
-<p><img src="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton/blob/gh-pages/images/sort64.png" alt=""></p>
+<p></p>
+    <img src="images/sort64.png">
+
 
 <h3>
 <a id="bitonic-sort" class="anchor" href="#bitonic-sort" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Bitonic Sort</h3>
 
 <p><img src="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton/blob/gh-pages/images/figure1.png" alt="">
 <img src="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton/blob/gh-pages/images/figure2.png" alt=""></p>
+
+<p>The sorting network gives us runs of 8 sorted integers. The next phase is to iteratively merge these sorted runs to produce a globally sorted array of the input elements. THis is achieved using 2 levels of merge. The lowest level (that is expected to entirely fit in L1 cache) is bitonic merge. This phase uses AVX2 intrinsics to vectorize the process of mergeing 2 sorted registers. The algorithm contains the following steps (summarized in figure 1)</p>
+
+<ol>
+<li>Consider 2 sorted input registers A and B. Reverse B.</li>
+<li>Perform min-max with the corresponding elements of each register - the first element of A is compared against the first element of reversed B and so on. This is termed as "Interleaved Minmax" and performs a comparison for all 8 elements. For this reason, this step can be directly implemented using AVX2 min-max instructions.</li>
+<li>After step 2, the bitonic merge algorithm guarantees that all the first 8 elements are smaller than the next 8 elements. The next step is performed separately for each input register. Within each register, the first element is compared against the 5th, second to 6th and so on. 4 comparisons are performed to produce output runs where the first 4 elements are smaller than the next 4 elements. This process of halving the problem size is continued till all elements are sorted.</li>
+<li>Step 3 minmax cannot be direct performed using AVX2 as it does not involve two registers. Instead an "unrolling" approach (as shown in Figure 2) is followed by creating a permutation of the given register and eventually completing step 3/</li>
+</ol>
+
+<p>Figure 2 is annotated with the latency of each avx2 instruction used to implement intra-register bitonic merge</p>
+
+<p>At the end of bitonic merge we receive two registers with globally sorted elements.</p>
+
+<h3>
+<a id="generalized-merge" class="anchor" href="#generalized-merge" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Generalized Merge</h3>
+
+<p>From the previous phase, bitonic merge can be directly applied to obtain runs of 16 elements that are sorted. Further levels of merge build up on 8-by-8 bitonic merge to completely sort the array. For instance, to merge 2 sorted 16 elements arrays, we perform the following steps -</p>
+
+<ol>
+<li> Apply Bitonic merge for the first 8 elements of the two input arrays. This outputs 2 registers where the first register (A) has sorted elements that are all smaller than the elements of the second sorted register (B). We store the contents of A into the output buffer. We then load in the next elements from the array which has the smaller element at the current pointer position and compare it against B.</li>
+<li>The process described in (1) is applied by consuming 8 elements at a time from either array to finally produce a sorted array of 16 elements.</li>
+<li>If there are n input elements, generalized merge repeats step 1 and 2 O(log n) times to completely sort the input array.</li>
+</ol>
 
 <h2>
 <a id="process" class="anchor" href="#process" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Process</h2>
