@@ -65,21 +65,15 @@
 
 <p>We are working based on the code base of  the CMU in-memory DBMS project Peloton. For SIMD merge-sort method, we plan to refer to the oracle and intel's sort merge work </p>
 
-<blockquote>
-<p>C. Kim, T. Kaldewey, V. W. Lee, E. Sedlar, A. D. Nguyen, N. Satish, J. Chhugani, A. Di Blas,and P. Dubey.  Sort vs. hash revisited:  fast join implementation on modern multi-core cpus.Proceedings of the VLDB Endowment, 2(2):1378–1389, 2009.</p>
-</blockquote>
+<p><code>C. Kim, T. Kaldewey, V. W. Lee, E. Sedlar, A. D. Nguyen, N. Satish, J. Chhugani, A. Di Blas,and P. Dubey.  Sort vs. hash revisited:  fast join implementation on modern multi-core cpus.Proceedings of the VLDB Endowment, 2(2):1378–1389, 2009.</code></p>
 
 <p>For the numa-aware improvement, we plan to refer to the method provided by the Hyper work</p>
 
-<blockquote>
-<p>M.-C.  Albutiu,  A.  Kemper,  and  T.  Neumann.   Massively  parallel  sort-merge  joins  in  mainmemory multi-core database systems.Proceedings of the VLDB Endowment, 5(10):1064–1075,201.</p>
-</blockquote>
+<p><code>M.-C.  Albutiu,  A.  Kemper,  and  T.  Neumann.   Massively  parallel  sort-merge  joins  in  mainmemory multi-core database systems.Proceedings of the VLDB Endowment, 5(10):1064–1075,201.</code></p>
 
 <p>For the partitioning improvement, we plan to refer to the Radix Hash Join method</p>
 
-<blockquote>
-<p>C.  Balkesen,  J.  Teubner,  G.  Alonso,  and  M.  T. ̈Ozsu.   Main-memory  hash  joins  on  multi-core cpus:  Tuning to the underlying hardware.  InData Engineering (ICDE), 2013 IEEE 29thInternational Conference on, pages 362–373. IEEE, 2013.</p>
-</blockquote>
+<p><code>C.  Balkesen,  J.  Teubner,  G.  Alonso,  and  M.  T. ̈Ozsu.   Main-memory  hash  joins  on  multi-core cpus:  Tuning to the underlying hardware.  InData Engineering (ICDE), 2013 IEEE 29thInternational Conference on, pages 362–373. IEEE, 2013.</code></p>
 
 <p>The parallel data lab provides PDL clusters for us to do the evaluation. There are nodes of NUMA architecture inside so as we can test the numa-aware implementation based on that.  Also, we plan to use TPC-h benchmark to compare the scalabilities among the non-paralel , non-NUMA-aware SIMD and NUMA-aware versions of peloton.</p>
 
