@@ -185,6 +185,13 @@
     <img src="images/sort64.png">
 
 
+<p>Sorting networks are designed to perform sorting on fixed numbers of values. The horizontal wires represents data flow. The vertical wires represents comparator which put smaller data to the upper line and larger data to the lower line.  A common case of sorting network is the 5-comparisons network for 4<em>4 elements sorting. In our implementation, the register size of avx2 could be 256 bit, thus can hold 8 elements, thus we utilized the Bose-Nelson Algorithm which sorts 8</em>8 elements in parallel. The algorithm is shown as the picture and it has 19 comparator and 7 rounds. we perform the following steps:</p>
+
+<ol>
+<li>Divide input data into 8*8 matrix and put them into the sorting network.</li>
+<li>Transpose the result matrix so as each input line of size 8 is sorted.</li>
+</ol>
+
 <h3>
 <a id="bitonic-sort" class="anchor" href="#bitonic-sort" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Bitonic Sort</h3>
 
