@@ -170,8 +170,6 @@
 </tbody>
 </table>
 
-<p><img src="https://www.dropbox.com/s/pf5ded1roqv42vu/Screenshot%202016-11-21%2003.35.27.png?dl=0" alt=""></p>
-
 <h2>
 <a id="work-completed" class="anchor" href="#work-completed" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Work Completed</h2>
 
@@ -190,10 +188,14 @@
 <h3>
 <a id="bitonic-sort" class="anchor" href="#bitonic-sort" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Bitonic Sort</h3>
 
-<p><img src="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton/blob/gh-pages/images/figure1.png" alt="">
-<img src="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton/blob/gh-pages/images/figure2.png" alt=""></p>
+<p></p>
+    <img src="images/figure1.png">
 
-<p>The sorting network gives us runs of 8 sorted integers. The next phase is to iteratively merge these sorted runs to produce a globally sorted array of the input elements. THis is achieved using 2 levels of merge. The lowest level (that is expected to entirely fit in L1 cache) is bitonic merge. This phase uses AVX2 intrinsics to vectorize the process of mergeing 2 sorted registers. The algorithm contains the following steps (summarized in figure 1)</p>
+
+<p></p>
+    <img src="images/figure2.png">
+
+The sorting network gives us runs of 8 sorted integers. The next phase is to iteratively merge these sorted runs to produce a globally sorted array of the input elements. THis is achieved using 2 levels of merge. The lowest level (that is expected to entirely fit in L1 cache) is bitonic merge. This phase uses AVX2 intrinsics to vectorize the process of mergeing 2 sorted registers. The algorithm contains the following steps (summarized in figure 1)
 
 <ol>
 <li>Consider 2 sorted input registers A and B. Reverse B.</li>
