@@ -54,6 +54,7 @@ using ::testing::InSequence;
 namespace peloton {
 namespace test {
 
+int ctr=0;
 class JoinTests : public PelotonTest {};
 
 std::vector<planner::MergeJoinPlan::JoinClause> CreateJoinClauses() {
@@ -454,8 +455,8 @@ void ExecuteJoinTest(PlanNodeType join_algorithm, PelotonJoinType join_type,
 
   txn_manager.CommitTransaction(txn);
 
-  LOG_TRACE("%s", left_table->GetInfo().c_str());
-  LOG_TRACE("%s", right_table->GetInfo().c_str());
+  LOG_DEBUG("%s", left_table->GetInfo().c_str());
+  LOG_DEBUG("%s", right_table->GetInfo().c_str());
 
   if (join_test_type == COMPLICATED_TEST) {
     // Modify some values in left and right tables for complicated test
@@ -490,26 +491,61 @@ void ExecuteJoinTest(PlanNodeType join_algorithm, PelotonJoinType join_type,
   std::vector<std::unique_ptr<executor::LogicalTile>>
       right_table_logical_tile_ptrs;
 
-  // Wrap the input tables with logical tiles
-  for (size_t left_table_tile_group_itr = 0;
-       left_table_tile_group_itr < left_table_tile_group_count;
-       left_table_tile_group_itr++) {
-    std::unique_ptr<executor::LogicalTile> left_table_logical_tile(
-        executor::LogicalTileFactory::WrapTileGroup(
-            left_table->GetTileGroup(left_table_tile_group_itr)));
-    left_table_logical_tile_ptrs.push_back(std::move(left_table_logical_tile));
+  // shuffle the tiles to validate sort phase
+  if (join_algorithm == PLAN_NODE_TYPE_SORT_MERGEJOIN) {
+    size_t index_ctr = 0;
+    left_table_logical_tile_ptrs.resize(left_table_tile_group_count);
+    right_table_logical_tile_ptrs.resize(right_table_tile_group_count);
+
+    // Wrap the input tables with logical tiles
+    for (size_t left_table_tile_group_itr = 0;
+         left_table_tile_group_itr < left_table_tile_group_count;
+         left_table_tile_group_itr++) {
+      std::unique_ptr<executor::LogicalTile> left_table_logical_tile(
+          executor::LogicalTileFactory::WrapTileGroup(
+              left_table->GetTileGroup(left_table_tile_group_itr)));
+      LOG_DEBUG("%s", left_table_logical_tile->GetInfo().c_str());
+      size_t tile_index_ptr = (++index_ctr) % left_table_tile_group_count;
+      left_table_logical_tile_ptrs[tile_index_ptr] = std::move(left_table_logical_tile);
+    }
+
+    index_ctr=0;
+
+    for (size_t right_table_tile_group_itr = 0;
+         right_table_tile_group_itr < right_table_tile_group_count;
+         right_table_tile_group_itr++) {
+      std::unique_ptr<executor::LogicalTile> right_table_logical_tile(
+          executor::LogicalTileFactory::WrapTileGroup(
+              right_table->GetTileGroup(right_table_tile_group_itr)));
+      LOG_DEBUG("%s", right_table_logical_tile->GetInfo().c_str());
+      size_t tile_index_ptr = (++index_ctr) % right_table_tile_group_count;
+      right_table_logical_tile_ptrs[tile_index_ptr] = std::move(right_table_logical_tile);
+    }
+  } else {
+    // Wrap the input tables with logical tiles
+    for (size_t left_table_tile_group_itr = 0;
+         left_table_tile_group_itr < left_table_tile_group_count;
+         left_table_tile_group_itr++) {
+      std::unique_ptr<executor::LogicalTile> left_table_logical_tile(
+          executor::LogicalTileFactory::WrapTileGroup(
+              left_table->GetTileGroup(left_table_tile_group_itr)));
+      LOG_DEBUG("%s", left_table_logical_tile->GetInfo().c_str());
+      left_table_logical_tile_ptrs.push_back(std::move(left_table_logical_tile));
+    }
+
+    for (size_t right_table_tile_group_itr = 0;
+         right_table_tile_group_itr < right_table_tile_group_count;
+         right_table_tile_group_itr++) {
+      std::unique_ptr<executor::LogicalTile> right_table_logical_tile(
+          executor::LogicalTileFactory::WrapTileGroup(
+              right_table->GetTileGroup(right_table_tile_group_itr)));
+      LOG_DEBUG("%s", right_table_logical_tile->GetInfo().c_str());
+      right_table_logical_tile_ptrs.push_back(
+          std::move(right_table_logical_tile));
+    }
   }
 
-  for (size_t right_table_tile_group_itr = 0;
-       right_table_tile_group_itr < right_table_tile_group_count;
-       right_table_tile_group_itr++) {
-    std::unique_ptr<executor::LogicalTile> right_table_logical_tile(
-        executor::LogicalTileFactory::WrapTileGroup(
-            right_table->GetTileGroup(right_table_tile_group_itr)));
-    right_table_logical_tile_ptrs.push_back(
-        std::move(right_table_logical_tile));
-  }
-
+  ctr++;
   // Left scan executor returns logical tiles from the left table
 
   EXPECT_CALL(left_table_scan_executor, DInit()).WillOnce(Return(true));
@@ -718,7 +754,7 @@ void ExecuteJoinTest(PlanNodeType join_algorithm, PelotonJoinType join_type,
           tuples_with_null +=
               CountTuplesWithNullFields(result_logical_tile.get());
           ValidateJoinLogicalTile(result_logical_tile.get());
-          LOG_TRACE("%s", result_logical_tile->GetInfo().c_str());
+          LOG_DEBUG("%s", result_logical_tile->GetInfo().c_str());
         }
       }
     } break;
