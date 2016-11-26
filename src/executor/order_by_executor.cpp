@@ -46,28 +46,32 @@ bool OrderByExecutor::DInit() {
 }
 
 bool OrderByExecutor::DExecute() {
+  size_t sort_buffer_size = 0, tile_size = 0;
+  std::shared_ptr<storage::Tile> ptile;
+
   LOG_TRACE("Order By executor ");
 
   if (!sort_done_) DoSort();
 
-  if (!(num_tuples_returned_ < sort_buffer_.size())) {
-    return false;
-  }
-
-  PL_ASSERT(sort_done_);
-  PL_ASSERT(input_schema_.get());
-  PL_ASSERT(input_tiles_.size() > 0);
-
-  // Returned tiles must be newly created physical tiles,
-  // which have the same physical schema as input tiles.
-  size_t tile_size = std::min(size_t(DEFAULT_TUPLES_PER_TILEGROUP),
-                              sort_buffer_.size() - num_tuples_returned_);
-
-  std::shared_ptr<storage::Tile> ptile(storage::TileFactory::GetTile(
-      BACKEND_TYPE_MM, INVALID_OID, INVALID_OID, INVALID_OID, INVALID_OID,
-      nullptr, *input_schema_, nullptr, tile_size));
-
   if (use_simd_sort_ == true) {
+    sort_buffer_size = simd_sort_buffer_.size();
+    if (!(num_tuples_returned_ < sort_buffer_size)) {
+      return false;
+    }
+
+    PL_ASSERT(sort_done_);
+    PL_ASSERT(input_schema_.get());
+    PL_ASSERT(input_tiles_.size() > 0);
+
+    // Returned tiles must be newly created physical tiles,
+    // which have the same physical schema as input tiles.
+    tile_size = std::min(size_t(DEFAULT_TUPLES_PER_TILEGROUP),
+                                sort_buffer_size - num_tuples_returned_);
+
+    ptile.reset(storage::TileFactory::GetTile(
+        BACKEND_TYPE_MM, INVALID_OID, INVALID_OID, INVALID_OID, INVALID_OID,
+        nullptr, *input_schema_, nullptr, tile_size));
+
     for (size_t id=0; id < tile_size; id++) {
       oid_t source_tile_id =
           simd_sort_buffer_[
@@ -83,6 +87,24 @@ bool OrderByExecutor::DExecute() {
       }
     }
   } else {
+    sort_buffer_size = sort_buffer_.size();
+    if (!(num_tuples_returned_ < sort_buffer_size)) {
+      return false;
+    }
+
+    PL_ASSERT(sort_done_);
+    PL_ASSERT(input_schema_.get());
+    PL_ASSERT(input_tiles_.size() > 0);
+
+    // Returned tiles must be newly created physical tiles,
+    // which have the same physical schema as input tiles.
+    tile_size = std::min(size_t(DEFAULT_TUPLES_PER_TILEGROUP),
+                                sort_buffer_size - num_tuples_returned_);
+
+    ptile.reset(storage::TileFactory::GetTile(
+        BACKEND_TYPE_MM, INVALID_OID, INVALID_OID, INVALID_OID, INVALID_OID,
+        nullptr, *input_schema_, nullptr, tile_size));
+
     for (size_t id = 0; id < tile_size; id++) {
       oid_t source_tile_id =
           sort_buffer_[num_tuples_returned_ + id].item_pointer.block;
@@ -106,7 +128,7 @@ bool OrderByExecutor::DExecute() {
 
   num_tuples_returned_ += tile_size;
 
-  PL_ASSERT(num_tuples_returned_ <= sort_buffer_.size());
+  PL_ASSERT(num_tuples_returned_ <= sort_buffer_size);
 
   return true;
 }
