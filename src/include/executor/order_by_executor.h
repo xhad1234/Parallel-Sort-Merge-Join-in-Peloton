@@ -77,6 +77,14 @@ class OrderByExecutor : public AbstractExecutor {
     sort_buffer_entry_t &operator=(const sort_buffer_entry_t &) = delete;
   };
 
+  struct simd_sort_entry_t {
+    int32_t key;
+    int32_t oid_hash;
+
+    simd_sort_entry_t(int32_t key, int32_t oid_hash)
+        : key(key), oid_hash(oid_hash) {};
+  };
+
   /** All tiles returned by child. */
   std::vector<std::unique_ptr<LogicalTile>> input_tiles_;
 
@@ -85,6 +93,14 @@ class OrderByExecutor : public AbstractExecutor {
 
   /** All valid tuples in sorted order */
   std::vector<sort_buffer_entry_t> sort_buffer_;
+
+  /** All valid tuples in sorted order
+   * Note: Used when the sorting column is an integer
+   * Can only sort tables that have oids <= 2^32
+   */
+  std::vector<simd_sort_entry_t> simd_sort_buffer_;
+
+  bool use_simd_sort_ = false;
 
   /** Size of each tile returned after sorting **/
   size_t output_tile_size_;
