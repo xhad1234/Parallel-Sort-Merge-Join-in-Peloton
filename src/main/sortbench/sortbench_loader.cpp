@@ -105,18 +105,16 @@ void CreateSortBenchDatabase() {
   txn = txn_manager.BeginTransaction();
 
   catalog->CreateTable(SORTBENCH_DB_NAME, left_table_name,
-                       std::move(left_table_schema), txn,
-                       1);
+                       std::move(left_table_schema), txn);
   txn_manager.CommitTransaction(txn);
   // create right table
   txn = txn_manager.BeginTransaction();
   catalog->CreateTable(SORTBENCH_DB_NAME, right_table_name,
-                       std::move(right_table_schema), txn,
-                       1);
+                       std::move(right_table_schema), txn);
   txn_manager.CommitTransaction(txn);
 }
 
-void LoadHelper(parser::InsertStatement* insert_stmt, int insert_size){
+void LoadHelper(parser::InsertStatement* insert_stmt){
   auto &txn_manager = concurrency::TransactionManagerFactory::GetInstance();
   planner::InsertPlan node(insert_stmt);
 
@@ -124,10 +122,10 @@ void LoadHelper(parser::InsertStatement* insert_stmt, int insert_size){
   auto txn = txn_manager.BeginTransaction();
   auto context = new executor::ExecutorContext(txn);
 
-  executor::AbstractExecutor* executor = new executor::InsertExecutor(context);
+  executor::AbstractExecutor* executor = new executor::InsertExecutor(&node, context);
   executor->Execute();
 
-  txn_manager.CommitTransaction(txns[partition]);
+  txn_manager.CommitTransaction(txn);
 
   for (auto val_list : *insert_stmt->insert_values){
     for (auto val : *val_list){
@@ -140,13 +138,13 @@ void LoadHelper(parser::InsertStatement* insert_stmt, int insert_size){
 }
 
 void LoadSortBenchDatabase() {
+  std::unique_ptr<parser::InsertStatement> insert_stmt(nullptr);
+
   left_table = catalog::Catalog::GetInstance()->GetTableWithName(
       SORTBENCH_DB_NAME, left_table_name);
 
   right_table = catalog::Catalog::GetInstance()->GetTableWithName(
       SORTBENCH_DB_NAME, right_table_name);
-
-  size_t num_partition = PL_NUM_PARTITIONS();
 
   char *left_table_name_arr = new char[left_table_name.size()+1];
   std::copy(left_table_name.begin(), left_table_name.end(), left_table_name_arr);
@@ -158,13 +156,13 @@ void LoadSortBenchDatabase() {
   char *right_db_name_arr = new char[strlen(SORTBENCH_DB_NAME)+1];
   strcpy(right_db_name_arr, SORTBENCH_DB_NAME);
 
-  auto *left_table = new parser::TableInfo();
-  left_table->table_name = left_table_name_arr;
-  left_table->database_name = left_db_name_arr;
+  auto *left_table_info = new parser::TableInfo();
+  left_table_info->table_name = left_table_name_arr;
+  left_table_info->database_name = left_db_name_arr;
 
-  auto *right_table = new parser::TableInfo();
-  right_table->table_name = right_table_name_arr;
-  right_table->database_name = right_db_name_arr;
+  auto *right_table_info = new parser::TableInfo();
+  right_table_info->table_name = right_table_name_arr;
+  right_table_info->database_name = right_db_name_arr;
 
   char *l_col_1 = new char[5];
   strcpy(l_col_1, "l_id");
@@ -174,10 +172,8 @@ void LoadSortBenchDatabase() {
   strcpy(l_col_3, "l_shipdate");
 
   // insert to left table; build an insert statement
-  std::unique_ptr<parser::InsertStatement> insert_stmt(
-      new parser::InsertStatement(INSERT_TYPE_VALUES));
-
-  insert_stmt->table_info_ = left_table;
+  insert_stmt.reset(new parser::InsertStatement(INSERT_TYPE_VALUES));
+  insert_stmt->table_info_ = left_table_info;
   insert_stmt->columns = new std::vector<char *>;
   insert_stmt->columns->push_back(const_cast<char *>(l_col_1));
   insert_stmt->columns->push_back(const_cast<char *>(l_col_2));
@@ -201,9 +197,9 @@ void LoadSortBenchDatabase() {
         common::ValueFactory::GetIntegerValue(shipdate)));
 
     if ((tuple_id + 1) % INSERT_SIZE == 0) {
-      LoadHelper(insert_stmt.get(), insert_size);
-      LOG_INFO("finished writing tuple in part table: %d", tuple_id+1);
-    }
+      LoadHelper(insert_stmt.get());
+      LOG_ERROR("Left Table: Inserted %d out of %d tuples", tuple_id+1,
+                LEFT_TABLE_SIZE*state.scale_factor);    }
   }
 
   char *r_col_1 = new char[5];
@@ -213,10 +209,9 @@ void LoadSortBenchDatabase() {
   char *r_col_3 = new char[11];
   strcpy(r_col_3, "r_shipdate");
 
-  // insert to left table; build an insert statement
-  std::unique_ptr<parser::InsertStatement> insert_stmt(
-      new parser::InsertStatement(INSERT_TYPE_VALUES));
-  insert_stmt->table_info_ = right_table_name;
+  // insert to right table; build an insert statement
+  insert_stmt.reset(new parser::InsertStatement(INSERT_TYPE_VALUES));
+  insert_stmt->table_info_ = right_table_info;
   insert_stmt->columns = new std::vector<char *>;
   insert_stmt->columns->push_back(const_cast<char *>(r_col_1));
   insert_stmt->columns->push_back(const_cast<char *>(r_col_2));
@@ -239,10 +234,14 @@ void LoadSortBenchDatabase() {
         common::ValueFactory::GetIntegerValue(shipdate)));
 
     if ((tuple_id + 1) % INSERT_SIZE == 0) {
-      LoadHelper(insert_stmt.get(), insert_size);
-      LOG_INFO("finished writing tuple in part table: %d", tuple_id+1);
+      LoadHelper(insert_stmt.get());
+      LOG_ERROR("Right Table: Inserted %d out of %d tuples", tuple_id+1,
+               RIGHT_TABLE_SIZE*state.scale_factor);
     }
   }
+
+  LOG_ERROR("Left table size:%ld", left_table->GetTupleCount());
+  LOG_ERROR("Right table size:%ld", right_table->GetTupleCount());
 }
 
 }  // namespace sortbench

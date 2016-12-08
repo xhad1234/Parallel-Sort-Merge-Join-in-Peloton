@@ -22,8 +22,14 @@
 #include "common/types.h"
 
 #define SORTBENCH_DB_NAME "sortbench_db"
+
 #define INSERT_SIZE 10000
+
 #define SIMD_SORT_KEY_BITS 10
+
+#define LEFT_TABLE_SIZE 100000
+
+#define RIGHT_TABLE_SIZE 100000
 
 namespace peloton {
 namespace benchmark {
@@ -65,7 +71,7 @@ void ParseArguments(int argc, char *argv[], configuration &state);
 
 void ValidateScaleFactor(const configuration &state);
 
-void WriteOutput(int thread_num);
+void WriteOutput();
 
 }  // namespace sortbench
 }  // namespace benchmark

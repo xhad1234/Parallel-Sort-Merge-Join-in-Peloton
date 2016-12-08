@@ -13,7 +13,7 @@
 
 #pragma once
 
-#include "benchmark/sortbench/sortbench_configuration.h"
+#include "benchmark/sortbench/sortbench_config.h"
 
 namespace peloton {
 namespace benchmark {

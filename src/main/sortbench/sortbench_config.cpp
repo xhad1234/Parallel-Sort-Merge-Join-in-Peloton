@@ -73,7 +73,7 @@ void ParseArguments(int argc, char *argv[], configuration &state) {
   ValidateScaleFactor(state);
 }
 
-void WriteOutput(int thread_num) {
+void WriteOutput() {
   std::ofstream out("outputfile.summary",
                     std::ios_base::app | std::ios_base::out);
 

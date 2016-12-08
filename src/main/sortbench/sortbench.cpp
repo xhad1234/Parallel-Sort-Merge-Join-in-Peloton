@@ -36,10 +36,10 @@ void RunBenchmark() {
   PelotonInit::Initialize();
 
   // Create the database
-  CreateScanBenchDatabase();
+  CreateSortBenchDatabase();
 
   // Load the databases
-  LoadScanBenchDatabase();
+  LoadSortBenchDatabase();
 
   // Run the workload, 3 trials
   //  for (int i=0; i<4; i++) {
@@ -67,7 +67,7 @@ void RunBenchmark() {
   PelotonInit::Shutdown();
 
   // Emit throughput
-  WriteOutput(ostream);
+  WriteOutput();
 }
 
 }  // namespace sortbench
