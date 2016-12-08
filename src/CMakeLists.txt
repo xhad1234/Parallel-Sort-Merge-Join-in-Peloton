@@ -64,11 +64,15 @@ file(GLOB_RECURSE ycsb_srcs ${PROJECT_SOURCE_DIR}/src/main/ycsb/*.cpp)
 add_executable(ycsb EXCLUDE_FROM_ALL ${ycsb_srcs})
 target_link_libraries(ycsb peloton)
 
+# --[ sortbench
+file(GLOB_RECURSE sortbench_srcs ${PROJECT_SOURCE_DIR}/src/main/sortbench/*.cpp)
+add_executable(sortbench EXCLUDE_FROM_ALL ${sortbench_srcs})
+target_link_libraries(sortbench peloton)
+
 # --[ sdbench
 file(GLOB_RECURSE sdbench_srcs ${PROJECT_SOURCE_DIR}/src/main/sdbench/*.cpp)
 add_executable(sdbench EXCLUDE_FROM_ALL ${sdbench_srcs})
 target_link_libraries(sdbench peloton)
-
 
 # --[ logger
 file(GLOB_RECURSE logger_srcs ${PROJECT_SOURCE_DIR}/src/main/logger/*.cpp)
@@ -78,7 +82,6 @@ list(APPEND logger_srcs ${tpcc_srcs})
 list(REMOVE_ITEM  logger_srcs ${PROJECT_SOURCE_DIR}/src/main/tpcc/tpcc.cpp)
 add_executable(logger EXCLUDE_FROM_ALL ${logger_srcs})
 target_link_libraries(logger peloton)
-
 
 # --[ link to jemalloc
 set(EXE_LINK_LIBRARIES ${JEMALLOC_LIBRARIES})

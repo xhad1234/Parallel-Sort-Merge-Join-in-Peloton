@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include <memory>
-#include <include/planner/order_by_plan.h>
 
 #include "common/harness.h"
 
