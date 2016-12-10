@@ -22,6 +22,7 @@
 #include <random>
 #include <cstddef>
 #include <limits>
+#include <include/expression/expression_util.h>
 
 #include "catalog/catalog.h"
 #include "common/logger.h"
@@ -63,7 +64,7 @@ void RunWorkload() {
   RunSortMergeJoin();
 }
 
-void ValidateJoinLogicalTile(executor::LogicalTile *logical_tile) {
+void ValidateJoinLogicalTile(executor::LogicalTile *logical_tile, int *prev_key) {
   PL_ASSERT(logical_tile);
 
   if (logical_tile->GetColumnCount() != 4) {
@@ -84,6 +85,13 @@ void ValidateJoinLogicalTile(executor::LogicalTile *logical_tile) {
     if (!(cmp.IsNull() || cmp.IsTrue())) {
       throw Exception("Joining attributes do not match");
     }
+
+    auto curr_key = left_tuple_join_attribute_val.GetAs<int>();
+    if (curr_key < *prev_key) {
+      throw Exception("Keys are not sorted - current:" + std::to_string(curr_key) + " previous:"
+                      + std::to_string(*prev_key));
+    }
+    *prev_key = curr_key;
   }
 }
 
@@ -151,7 +159,11 @@ void RunSortMergeJoin() {
   planner::OrderByPlan right_order_node(sort_keys, descend_flags, output_columns);
 
   std::vector<planner::MergeJoinPlan::JoinClause> join_clauses;
-  join_clauses.emplace_back(left_table_expr, right_table_expr, true);
+  auto left = expression::ExpressionUtil::TupleValueFactory(
+      common::Type::INTEGER, 0, 1);
+  auto right = expression::ExpressionUtil::TupleValueFactory(
+      common::Type::INTEGER, 1, 1);
+  join_clauses.emplace_back(left, right, true);
 
   // Create merge join plan node.
   planner::MergeJoinPlan merge_join_node(JOIN_TYPE_INNER, std::move(predicate),
@@ -178,11 +190,11 @@ void RunSortMergeJoin() {
 
   std::unique_ptr<executor::ExecutorContext> left_order_context(
       new executor::ExecutorContext(txn));
-  executor::OrderByExecutor left_order_executor(&left_seq_scan_node,
+  executor::OrderByExecutor left_order_executor(&left_order_node,
                                                 left_order_context.get());
   std::unique_ptr<executor::ExecutorContext> right_order_context(
       new executor::ExecutorContext(txn));
-  executor::OrderByExecutor right_order_executor(&right_seq_scan_node,
+  executor::OrderByExecutor right_order_executor(&right_order_node,
                                                  right_order_context.get());
 
   std::unique_ptr<executor::ExecutorContext> merge_join_context(
@@ -197,14 +209,17 @@ void RunSortMergeJoin() {
   right_order_executor.AddChild(&right_seq_scan_executor);
 
   merge_join_executor.Init();
+  int prev_key = INT_MIN;
+
   while (merge_join_executor.Execute() == true) {
     std::unique_ptr<executor::LogicalTile> result_logical_tile(
         merge_join_executor.GetOutput());
 
     if (result_logical_tile != nullptr) {
       result_tuple_count += result_logical_tile->GetTupleCount();
-      ValidateJoinLogicalTile(result_logical_tile.get());
-      LOG_DEBUG("%s", result_logical_tile->GetInfo().c_str());
+      ValidateJoinLogicalTile(result_logical_tile.get(), &prev_key);
+      LOG_DEBUG("Prev_key:%d", prev_key);
+      LOG_TRACE("%s", result_logical_tile->GetInfo().c_str());
     }
   }
 

@@ -41,9 +41,6 @@
 
 #include "parser/statement_insert.h"
 
-#define LINEITEM_TABLE_SIZE 6000000
-#define PART_TABLE_SIZE 200000
-
 namespace peloton {
 namespace benchmark {
 namespace sortbench {
@@ -52,9 +49,6 @@ storage::Database *sortbench_database = nullptr;
 
 storage::DataTable *left_table = nullptr;
 storage::DataTable *right_table = nullptr;
-
-std::string left_table_name = "LEFT_TABLE";
-std::string right_table_name = "RIGHT_TABLE";
 
 void CreateSortBenchDatabase() {
   /////////////////////////////////////////////////////////
@@ -104,12 +98,12 @@ void CreateSortBenchDatabase() {
   // create left table
   txn = txn_manager.BeginTransaction();
 
-  catalog->CreateTable(SORTBENCH_DB_NAME, left_table_name,
+  catalog->CreateTable(SORTBENCH_DB_NAME, "LEFT TABLE",
                        std::move(left_table_schema), txn);
   txn_manager.CommitTransaction(txn);
   // create right table
   txn = txn_manager.BeginTransaction();
-  catalog->CreateTable(SORTBENCH_DB_NAME, right_table_name,
+  catalog->CreateTable(SORTBENCH_DB_NAME, "RIGHT TABLE",
                        std::move(right_table_schema), txn);
   txn_manager.CommitTransaction(txn);
 }
@@ -141,19 +135,19 @@ void LoadSortBenchDatabase() {
   std::unique_ptr<parser::InsertStatement> insert_stmt(nullptr);
 
   left_table = catalog::Catalog::GetInstance()->GetTableWithName(
-      SORTBENCH_DB_NAME, left_table_name);
+      SORTBENCH_DB_NAME, "LEFT TABLE");
 
   right_table = catalog::Catalog::GetInstance()->GetTableWithName(
-      SORTBENCH_DB_NAME, right_table_name);
+      SORTBENCH_DB_NAME, "RIGHT TABLE");
 
-  char *left_table_name_arr = new char[left_table_name.size()+1];
-  std::copy(left_table_name.begin(), left_table_name.end(), left_table_name_arr);
-  char *left_db_name_arr = new char[strlen(SORTBENCH_DB_NAME)+1];
+  char *left_table_name_arr = new char[20]();
+  strcpy(left_table_name_arr, "LEFT TABLE");
+  char *left_db_name_arr = new char[20]();
   strcpy(left_db_name_arr, SORTBENCH_DB_NAME);
 
-  char *right_table_name_arr = new char[right_table_name.size()+1];
-  std::copy(right_table_name.begin(), right_table_name.end(), right_table_name_arr);
-  char *right_db_name_arr = new char[strlen(SORTBENCH_DB_NAME)+1];
+  char *right_table_name_arr = new char[20]();
+  strcpy(right_table_name_arr, "RIGHT TABLE");
+  char *right_db_name_arr = new char[20]();
   strcpy(right_db_name_arr, SORTBENCH_DB_NAME);
 
   auto *left_table_info = new parser::TableInfo();
@@ -164,11 +158,11 @@ void LoadSortBenchDatabase() {
   right_table_info->table_name = right_table_name_arr;
   right_table_info->database_name = right_db_name_arr;
 
-  char *l_col_1 = new char[5];
+  char *l_col_1 = new char[5]();
   strcpy(l_col_1, "l_id");
-  char *l_col_2 = new char[10];
+  char *l_col_2 = new char[10]();
   strcpy(l_col_2, "l_sortkey");
-  char *l_col_3 = new char[11];
+  char *l_col_3 = new char[11]();
   strcpy(l_col_3, "l_shipdate");
 
   // insert to left table; build an insert statement
@@ -187,7 +181,8 @@ void LoadSortBenchDatabase() {
     auto values_ptr = new std::vector<expression::AbstractExpression *>;
     insert_stmt->insert_values->push_back(values_ptr);
     int shipdate = rand() % 60;
-    int sortkey = rand() % (1 << SIMD_SORT_KEY_BITS);
+    int raw_sortkey = rand();
+    int sortkey = raw_sortkey % (1 << SIMD_SORT_KEY_BITS);
 
     values_ptr->push_back(new expression::ConstantValueExpression(
         common::ValueFactory::GetIntegerValue(tuple_id)));
@@ -202,11 +197,11 @@ void LoadSortBenchDatabase() {
                 LEFT_TABLE_SIZE*state.scale_factor);    }
   }
 
-  char *r_col_1 = new char[5];
+  char *r_col_1 = new char[5]();
   strcpy(r_col_1, "r_id");
-  char *r_col_2 = new char[10];
+  char *r_col_2 = new char[10]();
   strcpy(r_col_2, "r_sortkey");
-  char *r_col_3 = new char[11];
+  char *r_col_3 = new char[11]();
   strcpy(r_col_3, "r_shipdate");
 
   // insert to right table; build an insert statement

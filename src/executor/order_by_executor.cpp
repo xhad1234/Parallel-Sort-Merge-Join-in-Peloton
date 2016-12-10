@@ -166,7 +166,7 @@ bool OrderByExecutor::DoSort() {
   // use simd sort if we have a single integer column
   // being sorted in ascending order
   if (sort_key_columns.size() == 1  && descend_flags_[0] == false &&
-      sort_key_columns[0].GetType() == common::Type::INTEGER) {
+      sort_key_columns[0].GetType() == common::Type::VARCHAR) {
     use_simd_sort_ = true;
     simd_sort_buffer_.reserve(count);
     for (oid_t tile_id = 0; tile_id < input_tiles_.size(); tile_id++) {

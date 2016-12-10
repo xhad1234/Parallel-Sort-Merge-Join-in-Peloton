@@ -41,6 +41,8 @@ void RunBenchmark() {
   // Load the databases
   LoadSortBenchDatabase();
 
+  RunWorkload();
+
   // Run the workload, 3 trials
   //  for (int i=0; i<4; i++) {
   //    if (i == 0) {
