@@ -23,13 +23,11 @@
 
 #define SORTBENCH_DB_NAME "sortbench_db"
 
-#define INSERT_SIZE 10000
+#define INSERT_SIZE 100000
 
-#define SIMD_SORT_KEY_BITS 10
+#define LEFT_TABLE_SIZE 100000
 
-#define LEFT_TABLE_SIZE 10000
-
-#define RIGHT_TABLE_SIZE 10000
+#define RIGHT_TABLE_SIZE 100000
 
 namespace peloton {
 namespace benchmark {

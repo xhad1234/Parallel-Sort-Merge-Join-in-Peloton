@@ -22,6 +22,8 @@
 #include "planner/order_by_plan.h"
 #include "storage/tile.h"
 
+#include "util/simd_merge_sort.h"
+
 namespace peloton {
 namespace executor {
 
@@ -54,8 +56,7 @@ bool OrderByExecutor::DExecute() {
   if (!sort_done_) DoSort();
 
   if (use_simd_sort_ == true) {
-    sort_buffer_size = simd_sort_buffer_.size();
-    if (!(num_tuples_returned_ < sort_buffer_size)) {
+    if (!(num_tuples_returned_ < simd_sort_buffer_size_)) {
       return false;
     }
 
@@ -66,19 +67,16 @@ bool OrderByExecutor::DExecute() {
     // Returned tiles must be newly created physical tiles,
     // which have the same physical schema as input tiles.
     tile_size = std::min(size_t(DEFAULT_TUPLES_PER_TILEGROUP),
-                                sort_buffer_size - num_tuples_returned_);
+                                simd_sort_buffer_size_ - num_tuples_returned_);
 
     ptile.reset(storage::TileFactory::GetTile(
         BACKEND_TYPE_MM, INVALID_OID, INVALID_OID, INVALID_OID, INVALID_OID,
         nullptr, *input_schema_, nullptr, tile_size));
 
     for (size_t id=0; id < tile_size; id++) {
-      oid_t source_tile_id =
-          simd_sort_buffer_[
-              num_tuples_returned_+id].oid_hash/DEFAULT_TUPLES_PER_TILEGROUP;
-      oid_t source_tuple_id =
-          simd_sort_buffer_[
-              num_tuples_returned_+id].oid_hash % DEFAULT_TUPLES_PER_TILEGROUP;
+      oid_t source_tile_id, source_tuple_id;
+      simd_sort_buffer_[num_tuples_returned_ + id].deserialize(source_tile_id,
+                                                               source_tuple_id);
       // Insert a physical tuple into physical tile
       for (oid_t col = 0; col < input_schema_->GetColumnCount(); col++) {
         common::Value val = (
@@ -86,6 +84,7 @@ bool OrderByExecutor::DExecute() {
         ptile.get()->SetValue(val, id, col);
       }
     }
+    PL_ASSERT(num_tuples_returned_+tile_size <= simd_sort_buffer_size_);
   } else {
     sort_buffer_size = sort_buffer_.size();
     if (!(num_tuples_returned_ < sort_buffer_size)) {
@@ -117,6 +116,8 @@ bool OrderByExecutor::DExecute() {
         ptile.get()->SetValue(val, id, col);
       }
     }
+
+    PL_ASSERT(num_tuples_returned_+tile_size <= sort_buffer_size);
   }
 
   // Create an owner wrapper of this physical tile
@@ -128,7 +129,7 @@ bool OrderByExecutor::DExecute() {
 
   num_tuples_returned_ += tile_size;
 
-  PL_ASSERT(num_tuples_returned_ <= sort_buffer_size);
+
 
   return true;
 }
@@ -170,23 +171,50 @@ bool OrderByExecutor::DoSort() {
   // use simd sort if we have a single integer column
   // being sorted in ascending order
   if (sort_key_columns.size() == 1  && descend_flags_[0] == false &&
-      sort_key_columns[0].GetType() == common::Type::VARCHAR) {
+      sort_key_columns[0].GetType() == common::Type::INTEGER) {
     use_simd_sort_ = true;
-    simd_sort_buffer_.reserve(count);
+    simd_sort_buffer_size_= count;
+    size_t padded_count = count;
+    simd_sort_entry_t *temp;
+
+    if (count%64 != 0) {
+      padded_count = ((count+64)/64)*64;
+    }
+
+    if (posix_memalign((void **)&simd_sort_buffer_, 32,
+                       padded_count*sizeof(simd_sort_entry_t)) != 0) {
+      throw std::bad_alloc();
+    }
+
+    if (posix_memalign((void **)&temp, 32,
+                       padded_count*sizeof(simd_sort_entry_t)) != 0) {
+      throw std::bad_alloc();
+    }
+
+    size_t i=0;
     for (oid_t tile_id = 0; tile_id < input_tiles_.size(); tile_id++) {
       for (oid_t tuple_id : *input_tiles_[tile_id]) {
+        common::Value value =
+            input_tiles_[tile_id]->GetValue(tuple_id, node.GetSortKeys()[0]);
         PL_ASSERT(tuple_id < (oid_t)DEFAULT_TUPLES_PER_TILEGROUP);
-        common::Value value = input_tiles_[tile_id]->GetValue(tuple_id,
-                                                   node.GetSortKeys()[0]);
-        int32_t oid_hash = static_cast<int32_t>(
-            tile_id*DEFAULT_TUPLES_PER_TILEGROUP + tuple_id);
-        simd_sort_buffer_.emplace_back(value.GetAs<int32_t>(), oid_hash);
+        simd_sort_buffer_[i++].serialize(value.GetAs<int32_t>(),
+                                       tile_id, tuple_id);
       }
     }
 
-    PL_ASSERT(simd_sort_buffer_.size() == count);
+    while (i < padded_count) {
+      simd_sort_buffer_[i++].serialize_pad();
+    }
+
+    PL_ASSERT(simd_sort_buffer_size_ == count);
 
     // TODO:insert sort function here
+    auto result = util::simd_merge_sort(
+        reinterpret_cast<util::sort_ele_type *>(simd_sort_buffer_),
+        reinterpret_cast<util::sort_ele_type*>(temp), padded_count);
+
+    simd_sort_buffer_ = reinterpret_cast<simd_sort_entry_t*>(result.first);
+    delete result.second;
 
   } else {
     sort_key_tuple_schema_.reset(new catalog::Schema(sort_key_columns));

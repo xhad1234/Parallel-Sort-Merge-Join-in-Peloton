@@ -182,7 +182,8 @@ void LoadSortBenchDatabase() {
     insert_stmt->insert_values->push_back(values_ptr);
     int shipdate = rand() % 60;
     int raw_sortkey = rand();
-    int sortkey = raw_sortkey % (1 << SIMD_SORT_KEY_BITS);
+    int sortkey = raw_sortkey %
+        (1 << (sizeof(int32_t)*8 - ORDER_BY_SHIFT_OFFSET));
 
     values_ptr->push_back(new expression::ConstantValueExpression(
         common::ValueFactory::GetIntegerValue(tuple_id)));
@@ -219,7 +220,8 @@ void LoadSortBenchDatabase() {
     auto values_ptr = new std::vector<expression::AbstractExpression *>;
     insert_stmt->insert_values->push_back(values_ptr);
     int shipdate = rand() % 60;
-    int sortkey = rand() % (1 << SIMD_SORT_KEY_BITS);
+    int sortkey = rand() %
+        (1 << (sizeof(int32_t)*8 - ORDER_BY_SHIFT_OFFSET));
 
     values_ptr->push_back(new expression::ConstantValueExpression(
         common::ValueFactory::GetIntegerValue(tuple_id)));

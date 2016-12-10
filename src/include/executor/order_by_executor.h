@@ -78,11 +78,27 @@ class OrderByExecutor : public AbstractExecutor {
   };
 
   struct simd_sort_entry_t {
-    int32_t key;
-    int32_t oid_hash;
+    unsigned int ele;
 
-    simd_sort_entry_t(int32_t key, int32_t oid_hash)
-        : key(key), oid_hash(oid_hash) {};
+    simd_sort_entry_t(int32_t key, oid_t tile_group_id, oid_t tuple_id) {
+      serialize(key, tile_group_id, tuple_id);
+    }
+
+    void serialize(int32_t key, oid_t tile_group_id, oid_t tuple_id) {
+      ele = (key << ORDER_BY_SHIFT_OFFSET) +
+                   static_cast<unsigned int>(
+                       tile_group_id*DEFAULT_TUPLES_PER_TILEGROUP+tuple_id);
+    }
+
+    void serialize_pad() {
+      ele = ~(1 & 0);
+    }
+
+    void deserialize(oid_t& tile_group_id, oid_t& tuple_id) {
+      auto mask = (1 << ORDER_BY_SHIFT_OFFSET) - 1;
+      tuple_id = (ele & mask) % DEFAULT_TUPLES_PER_TILEGROUP;
+      tile_group_id = (ele & mask)/DEFAULT_TUPLES_PER_TILEGROUP;
+    }
   };
 
   /** All tiles returned by child. */
@@ -98,9 +114,11 @@ class OrderByExecutor : public AbstractExecutor {
    * Note: Used when the sorting column is an integer
    * Can only sort tables that have oids <= 2^32
    */
-  std::vector<simd_sort_entry_t> simd_sort_buffer_;
+  simd_sort_entry_t *simd_sort_buffer_;
 
   bool use_simd_sort_ = false;
+
+  size_t simd_sort_buffer_size_;
 
   /** Size of each tile returned after sorting **/
   size_t output_tile_size_;
