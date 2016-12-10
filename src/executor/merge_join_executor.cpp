@@ -12,6 +12,7 @@
 
 
 #include <vector>
+#include <chrono>
 
 #include "common/types.h"
 #include "common/logger.h"
@@ -91,6 +92,7 @@ bool MergeJoinExecutor::DExecute() {
   // Try to get next tile from LEFT child
   if (((left_child_done_ == false) && (left_start_row == left_end_row)) ||
       (right_child_done_ == true)) {
+
     if (children_[0]->Execute() == false) {
       LOG_TRACE("Did not get left tile ");
       left_child_done_ = true;

@@ -211,6 +211,10 @@ void RunSortMergeJoin() {
   merge_join_executor.Init();
   int prev_key = INT_MIN;
 
+  auto merge_start = static_cast<double>(
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now().time_since_epoch()).count());
+
   while (merge_join_executor.Execute() == true) {
     std::unique_ptr<executor::LogicalTile> result_logical_tile(
         merge_join_executor.GetOutput());
@@ -218,10 +222,15 @@ void RunSortMergeJoin() {
     if (result_logical_tile != nullptr) {
       result_tuple_count += result_logical_tile->GetTupleCount();
       ValidateJoinLogicalTile(result_logical_tile.get(), &prev_key);
-      LOG_DEBUG("Prev_key:%d", prev_key);
+      LOG_TRACE("Prev_key:%d", prev_key);
       LOG_TRACE("%s", result_logical_tile->GetInfo().c_str());
     }
   }
+
+  auto merge_end = static_cast<double>(
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now().time_since_epoch()).count());
+  LOG_ERROR("Merge Join Executor Time: %f", (merge_end-merge_start)/1000);
 
   txn_manager.CommitTransaction(txn);
 

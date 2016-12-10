@@ -139,6 +139,10 @@ bool OrderByExecutor::DoSort() {
   PL_ASSERT(!sort_done_);
   PL_ASSERT(executor_context_ != nullptr);
 
+  auto start = static_cast<double>(
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now().time_since_epoch()).count());
+
   // Extract all data from child
   while (children_[0]->Execute()) {
     input_tiles_.emplace_back(children_[0]->GetOutput());
@@ -257,6 +261,11 @@ bool OrderByExecutor::DoSort() {
 
   sort_done_ = true;
 
+  auto end = static_cast<double>(
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now().time_since_epoch()).count());
+
+  LOG_ERROR("Sort time:%f", (end-start)/1000);
   return true;
 }
 

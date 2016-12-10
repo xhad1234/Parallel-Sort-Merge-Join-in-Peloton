@@ -28,7 +28,6 @@ class MergeJoinExecutor : public AbstractJoinExecutor {
  public:
   explicit MergeJoinExecutor(const planner::AbstractPlan *node,
                              ExecutorContext *executor_context);
-
  protected:
   bool DInit();
 
