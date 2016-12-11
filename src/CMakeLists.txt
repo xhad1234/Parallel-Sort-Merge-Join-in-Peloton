@@ -69,6 +69,11 @@ file(GLOB_RECURSE sortbench_srcs ${PROJECT_SOURCE_DIR}/src/main/sortbench/*.cpp)
 add_executable(sortbench EXCLUDE_FROM_ALL ${sortbench_srcs})
 target_link_libraries(sortbench peloton)
 
+# --[ orderbench
+file(GLOB_RECURSE orderbench_srcs ${PROJECT_SOURCE_DIR}/src/main/orderbench/*.cpp)
+add_executable(orderbench EXCLUDE_FROM_ALL ${orderbench_srcs})
+target_link_libraries(orderbench peloton)
+
 # --[ sdbench
 file(GLOB_RECURSE sdbench_srcs ${PROJECT_SOURCE_DIR}/src/main/sdbench/*.cpp)
 add_executable(sdbench EXCLUDE_FROM_ALL ${sdbench_srcs})

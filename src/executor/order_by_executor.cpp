@@ -170,9 +170,9 @@ bool OrderByExecutor::DoSort() {
 
   // use simd sort if we have a single integer column
   // being sorted in ascending order
-  if (sort_key_columns.size() == 1  && descend_flags_[0] == false &&
+  if (use_simd_sort_ == true &&
+      sort_key_columns.size() == 1  && descend_flags_[0] == false &&
       sort_key_columns[0].GetType() == common::Type::INTEGER) {
-    use_simd_sort_ = true;
     simd_sort_buffer_size_= count;
     size_t padded_count = count;
     simd_sort_entry_t *temp;

@@ -41,6 +41,8 @@ class OrderByExecutor : public AbstractExecutor {
 
   ~OrderByExecutor();
 
+  void UseAVX2Sort() {use_simd_sort_ = true;}
+
  protected:
   bool DInit();
 
