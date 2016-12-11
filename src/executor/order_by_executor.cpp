@@ -168,8 +168,7 @@ bool OrderByExecutor::DoSort() {
 
   // use simd sort if we have a single integer column
   // being sorted in ascending order
-  if (use_simd_sort_ == true &&
-      sort_key_columns.size() == 1  && descend_flags_[0] == false &&
+  if (sort_key_columns.size() == 1  && descend_flags_[0] == false &&
       sort_key_columns[0].GetType() == common::Type::INTEGER) {
     simd_sort_buffer_size_= count;
     size_t padded_count = count;
@@ -207,12 +206,22 @@ bool OrderByExecutor::DoSort() {
     PL_ASSERT(simd_sort_buffer_size_ == count);
 
     // TODO:insert sort function here
-    auto result = util::simd_merge_sort(
-        reinterpret_cast<util::sort_ele_type *>(simd_sort_buffer_),
-        reinterpret_cast<util::sort_ele_type *>(temp), padded_count);
+    if (use_simd_sort_ == true) {
+      auto result = util::simd_merge_sort(
+          reinterpret_cast<util::sort_ele_type *>(simd_sort_buffer_),
+          reinterpret_cast<util::sort_ele_type *>(temp), padded_count);
 
-    simd_sort_buffer_ = reinterpret_cast<simd_sort_entry_t*>(result.first);
-    delete result.second;
+      simd_sort_buffer_ = reinterpret_cast<simd_sort_entry_t*>(result.first);
+      delete result.second;
+    } else {
+      struct KeyComparer {
+        bool operator ()(const simd_sort_entry_t& a, const simd_sort_entry_t& b) {
+          return a.key < b.key;
+        }
+      };
+      std::sort(simd_sort_buffer_, simd_sort_buffer_+padded_count, KeyComparer());
+    }
+
 
   } else {
     sort_key_tuple_schema_.reset(new catalog::Schema(sort_key_columns));

@@ -149,9 +149,7 @@ void LoadOrderBenchDatabase() {
     auto values_ptr = new std::vector<expression::AbstractExpression *>;
     insert_stmt->insert_values->push_back(values_ptr);
     int shipdate = rand() % 60;
-    int raw_sortkey = rand();
-    int sortkey = raw_sortkey %
-                  (1 << (sizeof(int32_t)*8 - ORDER_BY_SHIFT_OFFSET));
+    int sortkey = rand();
 
     values_ptr->push_back(new expression::ConstantValueExpression(
         common::ValueFactory::GetIntegerValue(tuple_id)));

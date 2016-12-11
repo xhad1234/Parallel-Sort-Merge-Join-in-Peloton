@@ -74,8 +74,6 @@ extern int TEST_TUPLES_PER_TILEGROUP;
 #define VARCHAR_LENGTH_MID 256
 #define VARCHAR_LENGTH_LONG 4096
 
-#define ORDER_BY_SHIFT_OFFSET 22
-
 //===--------------------------------------------------------------------===//
 // Port to OSX
 //===---------------------------
