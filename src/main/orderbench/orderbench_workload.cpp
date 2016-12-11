@@ -85,6 +85,9 @@ void ValidateOutputLogicalTile(executor::LogicalTile *logical_tile, int& prev_ke
 }
 
 void RunOrderBench() {
+  auto order_start = static_cast<double>(
+      std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::steady_clock::now().time_since_epoch()).count());
 
   int result_tuple_count = 0;
   auto &txn_manager =
@@ -104,10 +107,6 @@ void RunOrderBench() {
   // ================================
   //         Executors
   // ================================
-
-  auto order_start = static_cast<double>(
-      std::chrono::duration_cast<std::chrono::microseconds>(
-          std::chrono::steady_clock::now().time_since_epoch()).count());
 
   // Create executor context with empty txn
   auto txn = txn_manager.BeginTransaction();
@@ -141,12 +140,12 @@ void RunOrderBench() {
     }
   }
 
+  txn_manager.CommitTransaction(txn);
+
   auto order_end = static_cast<double>(
       std::chrono::duration_cast<std::chrono::microseconds>(
           std::chrono::steady_clock::now().time_since_epoch()).count());
   LOG_ERROR("Order Executor Time: %f", (order_end-order_start)/1000);
-
-  txn_manager.CommitTransaction(txn);
 
   state.execution_time_ms = (order_end-order_start)/1000;
   LOG_INFO("Result_Tuples: %d", result_tuple_count);

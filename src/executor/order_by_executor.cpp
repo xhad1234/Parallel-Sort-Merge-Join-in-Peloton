@@ -129,8 +129,6 @@ bool OrderByExecutor::DExecute() {
 
   num_tuples_returned_ += tile_size;
 
-
-
   return true;
 }
 
