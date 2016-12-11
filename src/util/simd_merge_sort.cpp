@@ -61,8 +61,18 @@ inline void transpose8_64i(__m256i *rows) {
   rows[3] = _mm256_permute2x128_si256(__t5, __t7, 0x20);
   rows[5] = _mm256_permute2x128_si256(__t4, __t6, 0x31);
   rows[7] = _mm256_permute2x128_si256(__t5, __t7, 0x31);
+}
 
+inline void transpose4_64i(__m256i *rows) {
+  __m256i __t0 = _mm256_unpacklo_epi64(rows[0], rows[1]);
+  __m256i __t1 = _mm256_unpackhi_epi64(rows[0], rows[1]);
+  __m256i __t2 = _mm256_unpacklo_epi64(rows[2], rows[3]);
+  __m256i __t3 = _mm256_unpackhi_epi64(rows[2], rows[3]);
 
+  rows[0] = _mm256_permute2x128_si256(__t0, __t2, 0x20);
+  rows[1] = _mm256_permute2x128_si256(__t1, __t3, 0x20);
+  rows[2] = _mm256_permute2x128_si256(__t0, __t2, 0x31);
+  rows[3] = _mm256_permute2x128_si256(__t1, __t3, 0x31);
 }
 
 void sort_columns_64i(__m256i& row0, __m256i& row1,
@@ -88,6 +98,10 @@ void merge8_64i(__m256i *rows) {
   minmax(rows[5], rows[6]);
 }
 
+void sort16_64i(__m256i *rows) {
+  sort_columns_64i(rows[0], rows[1], rows[2], rows[3]);
+  transpose4_64i(rows);
+}
 
 void sort32_64i(__m256i *rows) {
   sort_columns_64i(rows[0], rows[1], rows[2], rows[3]);
@@ -115,24 +129,15 @@ void intra_register_sort(__m256i& a) {
 }
 
 
-// 8-by-8 merge
-void bitonic_merge(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
-  __m256i a1, b1, c1, d1;
-  // 8-by-8 minmax
-  auto cr = reverse(c);
-  auto dr = reverse(d);
-  minmax(a, dr, a1, c1);
-  minmax(b, cr, b1, d1);
-
+// 4-by-4 merge
+void bitonic_merge(__m256i& a, __m256i& b) {
   // 4-by-4 minmax
-  minmax(a1, b1, a, b);
-  minmax(c1, d1, c, d);
+  b = reverse(b);
+  minmax(a, b);
 
   // intra-register minmax
   intra_register_sort(a);
   intra_register_sort(b);
-  intra_register_sort(c);
-  intra_register_sort(d);
 }
 
 // the two input arrays are a[start, mid] and a[mid+1, end]
@@ -144,86 +149,60 @@ void merge_phase(sort_ele_type *a, sort_ele_type *out,
 
   auto ra = load_reg256(&a[i]);
   i += SIMD_SIZE;
-  auto rb = load_reg256(&a[i]);
-  i += SIMD_SIZE;
-  auto rc = load_reg256(&a[j]);
-  j += SIMD_SIZE;
-  auto rd = load_reg256(&a[j]);
+  auto rb = load_reg256(&a[j]);
   j += SIMD_SIZE;
 
   if (i < i_end && j < j_end) {
     do {
-      bitonic_merge(ra, rb, rc, rd);
+      bitonic_merge(ra, rb);
 
       // save the smaller half
       store_reg256(&out[k], ra);
       k += SIMD_SIZE;
-      store_reg256(&out[k], rb);
-      k += SIMD_SIZE;
 
       // use the larger half for the next comparison
-      ra = rc;
-      rb = rd;
+      ra = rb;
 
       // select the input with the lowest value at the current pointer
       // use the lower 32-bits for comparison
       if (*((int *)&a[i]) < *((int *)&a[j])) {
-        rc = load_reg256(&a[i]);
-        i += SIMD_SIZE;
-        rd = load_reg256(&a[i]);
+        rb = load_reg256(&a[i]);
         i += SIMD_SIZE;
       } else {
-        rc = load_reg256(&a[j]);
-        j += SIMD_SIZE;
-        rd = load_reg256(&a[j]);
+        rb = load_reg256(&a[j]);
         j += SIMD_SIZE;
       }
     } while (i < i_end && j < j_end);
   }
 
   // merge the final pair of registers from each input
-  bitonic_merge(ra, rb, rc, rd);
+  bitonic_merge(ra, rb);
   store_reg256(&out[k], ra);
   k += SIMD_SIZE;
-  store_reg256(&out[k], rb);
-  k += SIMD_SIZE;
-  ra = rc;
-  rb = rd;
+  ra = rb;
 
   // consume remaining data from a, if left
   while (i < i_end) {
-    rc = load_reg256(&a[i]);
+    rb = load_reg256(&a[i]);
     i += SIMD_SIZE;
-    rd = load_reg256(&a[i]);
-    i += SIMD_SIZE;
-    bitonic_merge(ra, rb, rc, rd);
+    bitonic_merge(ra, rb);
     store_reg256(&out[k], ra);
     k += SIMD_SIZE;
-    store_reg256(&out[k], rb);
-    k += SIMD_SIZE;
-    ra = rc;
-    rb = rd;
+    ra = rb;
   }
 
   // consume remaining data from b, if left
   while (j < j_end) {
-    rc = load_reg256(&a[j]);
+    rb = load_reg256(&a[j]);
     j += SIMD_SIZE;
-    rd = load_reg256(&a[j]);
-    j += SIMD_SIZE;
-    bitonic_merge(ra, rb, rc, rd);
+    bitonic_merge(ra, rb);
     store_reg256(&out[k], ra);
     k += SIMD_SIZE;
-    store_reg256(&out[k], rb);
-    k += SIMD_SIZE;
-    ra = rc;
-    rb = rd;
+    ra = rb;
   }
 
   // store the final batch
   store_reg256(&out[k], ra);
-  k += SIMD_SIZE;
-  store_reg256(&out[k], rb);
   k += SIMD_SIZE;
 }
 
@@ -252,8 +231,8 @@ std::pair<sort_ele_type*, sort_ele_type*>
    * even iterations: a->b
    * odd iterations: b->a
    */
-  // start from 8-8 merge
-  for (size_t pass_size=2*SIMD_SIZE; pass_size<len; pass_size*=2, i++) {
+  // start from 4-4 merge
+  for (size_t pass_size=SIMD_SIZE; pass_size<len; pass_size*=2, i++) {
     if (i%2 == 0) {
       merge_pass(a, b, len, pass_size);
     } else {
@@ -276,7 +255,7 @@ std::pair<sort_ele_type*, sort_ele_type*>
     for (int j=0; j < SORT_SIZE/SIMD_SIZE; j++) {
       rows[j] = load_reg256(&a[i+j*SIMD_SIZE]);
     }
-    sort32_64i(rows);
+    sort16_64i(rows);
     for (int j = 0; j < SORT_SIZE/SIMD_SIZE; j++) {
       store_reg256(&a[i+j*SIMD_SIZE], rows[j]);
     }

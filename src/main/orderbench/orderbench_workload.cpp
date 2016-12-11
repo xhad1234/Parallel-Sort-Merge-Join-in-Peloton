@@ -109,7 +109,7 @@ void RunOrderBench() {
   // ================================
 
   // Create executor context with empty txn
-  auto txn = txn_manager.BeginTransaction();
+  auto txn = txn_manager.BeginReadonlyTransaction();
 
   std::unique_ptr<executor::ExecutorContext> seq_scan_context(
       new executor::ExecutorContext(txn));

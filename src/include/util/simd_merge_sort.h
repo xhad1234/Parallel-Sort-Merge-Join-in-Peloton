@@ -16,7 +16,7 @@
 #include <vector>
 
 #define SIMD_SIZE 4
-#define SORT_SIZE 32
+#define SORT_SIZE 16
 
 namespace peloton {
 namespace util {
