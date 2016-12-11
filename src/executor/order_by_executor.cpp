@@ -209,7 +209,7 @@ bool OrderByExecutor::DoSort() {
     // TODO:insert sort function here
     auto result = util::simd_merge_sort(
         reinterpret_cast<util::sort_ele_type *>(simd_sort_buffer_),
-        reinterpret_cast<util::sort_ele_type*>(temp), padded_count);
+        reinterpret_cast<util::sort_ele_type *>(temp), padded_count);
 
     simd_sort_buffer_ = reinterpret_cast<simd_sort_entry_t*>(result.first);
     delete result.second;
