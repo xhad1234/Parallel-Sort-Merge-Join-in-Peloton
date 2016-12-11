@@ -55,7 +55,7 @@ bool OrderByExecutor::DExecute() {
 
   if (!sort_done_) DoSort();
 
-  if (use_simd_sort_ == true) {
+  if (int_sort_ == true) {
     if (!(num_tuples_returned_ < simd_sort_buffer_size_)) {
       return false;
     }
@@ -170,6 +170,7 @@ bool OrderByExecutor::DoSort() {
   // being sorted in ascending order
   if (sort_key_columns.size() == 1  && descend_flags_[0] == false &&
       sort_key_columns[0].GetType() == common::Type::INTEGER) {
+    int_sort_ = true;
     simd_sort_buffer_size_= count;
     size_t padded_count = count;
     simd_sort_entry_t *temp;

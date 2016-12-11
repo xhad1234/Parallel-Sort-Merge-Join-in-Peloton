@@ -120,6 +120,8 @@ class OrderByExecutor : public AbstractExecutor {
 
   bool use_simd_sort_ = false;
 
+  bool int_sort_ = true;
+
   size_t simd_sort_buffer_size_;
 
   /** Size of each tile returned after sorting **/
