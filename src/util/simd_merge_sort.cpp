@@ -131,34 +131,6 @@ void sort64(__m256i *row) {
   sort64(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]);
 }
 
-std::pair<__m256i, __m256i> bitonic_merge(__m256i &a, __m256i &b) {
-  __m256i minab, maxab, temp_a, temp_b, ret_a, ret_b;
-  // phase 1 - 8 against 8
-  __m256i br = reverse(b);
-  minmax(a, br, minab, maxab);
-  temp_a = _mm256_permute4x64_epi64(minab, 0xd8);
-  temp_b = _mm256_permute4x64_epi64(maxab, 0xd8);
-  ret_a = _mm256_unpacklo_epi32(temp_a, temp_b);
-  ret_b = _mm256_unpackhi_epi32(temp_a, temp_b);
-
-  // phase 2 - 4 against 4
-  minmax(ret_a, ret_b, minab, maxab);
-  ret_a = _mm256_permute2x128_si256(minab, maxab, 0x20);
-  ret_b = _mm256_permute2x128_si256(minab, maxab, 0x31);
-
-  // phase 3 - 2 against 2
-  minmax(ret_a, ret_b, minab, maxab);
-  ret_a = _mm256_unpacklo_epi32(minab, maxab);
-  ret_b = _mm256_unpackhi_epi32(minab, maxab);
-
-  // phase 4 - 1 against 1 and completion
-  minmax(ret_a, ret_b, minab, maxab);
-  ret_a = _mm256_unpacklo_epi32(minab, maxab);
-  ret_b = _mm256_unpackhi_epi32(minab, maxab);
-
-  return std::make_pair(ret_a, ret_b);
-}
-
 __m256i intra_register_sort(__m256i &l8) {
   __m256i min, max;
   // phase 1
@@ -173,6 +145,14 @@ __m256i intra_register_sort(__m256i &l8) {
   auto l2_1 = _mm256_shuffle_epi32(l2, 0xb1);
   minmax(l2, l2_1, min, max);
   return _mm256_blend_epi32(min, max, 0xaa);
+}
+
+std::pair<__m256i, __m256i> bitonic_merge(__m256i &a, __m256i &b) {
+  __m256i minab, maxab;
+  // phase 1 - 8 against 8
+  __m256i br = reverse(b);
+  minmax(a, br, minab, maxab);
+  return std::make_pair(intra_register_sort(minab), intra_register_sort(maxab));
 }
 
 // the two input arrays are a[start, mid] and a[mid+1, end]
