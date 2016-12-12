@@ -143,7 +143,11 @@ void intra_register_sort(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
   b1 = _mm256_permute4x64_epi64(b, 0x4e);
   c1 = _mm256_permute4x64_epi64(c, 0x4e);
   d1 = _mm256_permute4x64_epi64(d, 0x4e);
-  minmax(a, a1, a2, a3, b, b1, b2, b3, c, c1, c2, c3, d, d1, d2, d3);
+  minmax(a, a1, a2, a3);
+  minmax(b, b1, b2, b3);
+  minmax(c, c1, c2, c3);
+  minmax(d, d1, d2, d3);
+
   // pick top-2 and last-2 64 bit elements from
   // corresponding registers
   a = _mm256_blend_epi32(a2, a3, 0xf0);
@@ -156,7 +160,10 @@ void intra_register_sort(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
   b1 = _mm256_shuffle_epi32(b, 0x4e);
   c1 = _mm256_shuffle_epi32(c, 0x4e);
   d1 = _mm256_shuffle_epi32(d, 0x4e);
-  minmax(a, a1, a2, a3, b, b1, b2, b3, c, c1, c2, c3, d, d1, d2, d3);
+  minmax(a, a1, a2, a3);
+  minmax(b, b1, b2, b3);
+  minmax(c, c1, c2, c3);
+  minmax(d, d1, d2, d3);
 
   // pick alternate elements from registers
   a = _mm256_blend_epi32(a2, a3, 0xcc);
@@ -172,13 +179,48 @@ void bitonic_merge(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
   // 8-by-8 minmax
   auto cr = reverse(c);
   auto dr = reverse(d);
-  minmax(a, dr, a1, c1, b, cr, b1, d1);
+  minmax(a, dr, a1, c1);
+  minmax(b, cr, b1, d1);
 
   // 4-by-4 minmax
-  minmax(a1, b1, a, b, c1, d1, c, d);
+  minmax(a1, b1, a, b);
+  minmax(c1, d1, c, d);
 
   // intra-register minmax
   intra_register_sort(a, b, c, d);
+}
+
+// 16-by-16 merge
+void bitonic_merge(__m256i& a, __m256i& b, __m256i& c, __m256i& d,
+                   __m256i& e, __m256i& f, __m256i& g, __m256i& h) {
+  __m256i a1, a2, b1, b2, c1, c2, d1, d2,
+      e1, e2, f1, f2, g1, g2, h1, h2;
+
+  // 16-by-16 minmax
+  auto er = reverse(e);
+  auto fr = reverse(f);
+  auto gr = reverse(g);
+  auto hr = reverse(h);
+  minmax(a, hr, a1, h1);
+  minmax(b, gr, b1, g1);
+  minmax(c, fr, c1, f1);
+  minmax(d, er, d1, e1);
+
+  // 8-by-8 minmax
+  minmax(a1, c1, a2, c2);
+  minmax(b1, d1, b2, d2);
+  minmax(e1, g1, e2, g2);
+  minmax(f1, h1, f2, h2);
+
+  // 4-by-4 minmax
+  minmax(a2, b2, a, b);
+  minmax(c2, d2, c, d);
+  minmax(e2, f2, e, f);
+  minmax(g2, h2, g, h);
+
+  // intra-register minmax
+  intra_register_sort(a, b, c, d);
+  intra_register_sort(e, f, g, h);
 }
 
 // the two input arrays are a[start, mid] and a[mid+1, end]
@@ -192,84 +234,146 @@ void merge_phase(sort_ele_type *a, sort_ele_type *out,
   i += SIMD_SIZE;
   auto rb = load_reg256(&a[i]);
   i += SIMD_SIZE;
-  auto rc = load_reg256(&a[j]);
+  auto rc = load_reg256(&a[i]);
+  i += SIMD_SIZE;
+  auto rd = load_reg256(&a[i]);
+  i += SIMD_SIZE;
+  auto re = load_reg256(&a[j]);
   j += SIMD_SIZE;
-  auto rd = load_reg256(&a[j]);
+  auto rf = load_reg256(&a[j]);
+  j += SIMD_SIZE;
+  auto rg = load_reg256(&a[j]);
+  j += SIMD_SIZE;
+  auto rh = load_reg256(&a[j]);
   j += SIMD_SIZE;
 
   if (i < i_end && j < j_end) {
     do {
-      bitonic_merge(ra, rb, rc, rd);
+      bitonic_merge(ra, rb, rc, rd,
+                    re, rf, rg, rh);
 
       // save the smaller half
       store_reg256(&out[k], ra);
       k += SIMD_SIZE;
       store_reg256(&out[k], rb);
       k += SIMD_SIZE;
+      store_reg256(&out[k], rc);
+      k += SIMD_SIZE;
+      store_reg256(&out[k], rd);
+      k += SIMD_SIZE;
 
       // use the larger half for the next comparison
-      ra = rc;
-      rb = rd;
+      ra = re;
+      rb = rf;
+      rc = rg;
+      rd = rh;
 
       // select the input with the lowest value at the current pointer
       // use the lower 32-bits for comparison
       if (*((int *)&a[i]) < *((int *)&a[j])) {
-        rc = load_reg256(&a[i]);
+        re = load_reg256(&a[i]);
         i += SIMD_SIZE;
-        rd = load_reg256(&a[i]);
+        rf = load_reg256(&a[i]);
+        i += SIMD_SIZE;
+        rg = load_reg256(&a[i]);
+        i += SIMD_SIZE;
+        rh = load_reg256(&a[i]);
         i += SIMD_SIZE;
       } else {
-        rc = load_reg256(&a[j]);
+        re = load_reg256(&a[j]);
         j += SIMD_SIZE;
-        rd = load_reg256(&a[j]);
+        rf = load_reg256(&a[j]);
+        j += SIMD_SIZE;
+        rg = load_reg256(&a[j]);
+        j += SIMD_SIZE;
+        rh = load_reg256(&a[j]);
         j += SIMD_SIZE;
       }
     } while (i < i_end && j < j_end);
   }
 
   // merge the final pair of registers from each input
-  bitonic_merge(ra, rb, rc, rd);
+  bitonic_merge(ra, rb, rc, rd,
+                re, rf, rg, rh);
+
   store_reg256(&out[k], ra);
   k += SIMD_SIZE;
   store_reg256(&out[k], rb);
   k += SIMD_SIZE;
-  ra = rc;
-  rb = rd;
+  store_reg256(&out[k], rc);
+  k += SIMD_SIZE;
+  store_reg256(&out[k], rd);
+  k += SIMD_SIZE;
+
+  ra = re;
+  rb = rf;
+  rc = rg;
+  rd = rh;
 
   // consume remaining data from a, if left
   while (i < i_end) {
-    rc = load_reg256(&a[i]);
+    re = load_reg256(&a[i]);
     i += SIMD_SIZE;
-    rd = load_reg256(&a[i]);
+    rf = load_reg256(&a[i]);
     i += SIMD_SIZE;
-    bitonic_merge(ra, rb, rc, rd);
+    rg = load_reg256(&a[i]);
+    i += SIMD_SIZE;
+    rh = load_reg256(&a[i]);
+    i += SIMD_SIZE;
+
+    bitonic_merge(ra, rb, rc, rd,
+                  re, rf, rg, rh);
+
     store_reg256(&out[k], ra);
     k += SIMD_SIZE;
     store_reg256(&out[k], rb);
     k += SIMD_SIZE;
-    ra = rc;
-    rb = rd;
+    store_reg256(&out[k], rc);
+    k += SIMD_SIZE;
+    store_reg256(&out[k], rd);
+    k += SIMD_SIZE;
+
+    ra = re;
+    rb = rf;
+    rc = rg;
+    rd = rh;
   }
 
   // consume remaining data from b, if left
   while (j < j_end) {
-    rc = load_reg256(&a[j]);
+    re = load_reg256(&a[j]);
     j += SIMD_SIZE;
-    rd = load_reg256(&a[j]);
+    rf = load_reg256(&a[j]);
     j += SIMD_SIZE;
-    bitonic_merge(ra, rb, rc, rd);
+    rg = load_reg256(&a[j]);
+    j += SIMD_SIZE;
+    rh = load_reg256(&a[j]);
+    j += SIMD_SIZE;
+    bitonic_merge(ra, rb, rc, rd,
+                  re, rf, rg, rh);
+
     store_reg256(&out[k], ra);
     k += SIMD_SIZE;
     store_reg256(&out[k], rb);
     k += SIMD_SIZE;
-    ra = rc;
-    rb = rd;
+    store_reg256(&out[k], rc);
+    k += SIMD_SIZE;
+    store_reg256(&out[k], rd);
+    k += SIMD_SIZE;
+
+    ra = re;
+    rb = rf;
+    rc = rg;
+    rd = rh;
   }
 
-  // store the final batch
   store_reg256(&out[k], ra);
   k += SIMD_SIZE;
   store_reg256(&out[k], rb);
+  k += SIMD_SIZE;
+  store_reg256(&out[k], rc);
+  k += SIMD_SIZE;
+  store_reg256(&out[k], rd);
   k += SIMD_SIZE;
 }
 
@@ -298,8 +402,21 @@ std::pair<sort_ele_type*, sort_ele_type*>
    * even iterations: a->b
    * odd iterations: b->a
    */
-  // start from 8-8 merge
-  for (size_t pass_size=2*SIMD_SIZE; pass_size<len; pass_size*=2, i++) {
+  // first do a 8-8 merge
+  for (size_t j=0; j < len-1; j+=16) {
+    auto r1 = load_reg256(&a[j]);
+    auto r2 = load_reg256(&a[j+4]);
+    auto r3 = load_reg256(&a[j+8]);
+    auto r4 = load_reg256(&a[j+12]);
+    bitonic_merge(r1, r2, r3, r4);
+    store_reg256(&b[j], r1);
+    store_reg256(&b[j+4], r2);
+    store_reg256(&b[j+8], r3);
+    store_reg256(&b[j+12], r4);
+  }
+  i++;
+  // start from 16-16 merge
+  for (size_t pass_size=4*SIMD_SIZE; pass_size<len; pass_size*=2, i++) {
     if (i%2 == 0) {
       merge_pass(a, b, len, pass_size);
     } else {
