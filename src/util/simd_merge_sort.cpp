@@ -33,6 +33,44 @@ inline void minmax(const __m256i& a, const __m256i& b, __m256i& c, __m256i& d) {
   d = _mm256_blendv_epi8(b, a, mask);
 }
 
+inline void minmax(const __m256i& a, const __m256i& a1, __m256i& a2, __m256i& a3,
+                   const __m256i& b, const __m256i& b1, __m256i& b2, __m256i& b3) {
+  auto maska = _mm256_cmpgt_epi32 (a, a1);
+  auto maskb = _mm256_cmpgt_epi32 (b, b1);
+  maska = _mm256_shuffle_epi32(maska, 0xA0);
+  maskb = _mm256_shuffle_epi32(maskb, 0xA0);
+  a2 = _mm256_blendv_epi8(a, a1, maska);
+  b2 = _mm256_blendv_epi8(b, b1, maskb);
+  a3 = _mm256_blendv_epi8(a1, a, maska);
+  b3 = _mm256_blendv_epi8(b1, b, maskb);
+}
+
+inline void minmax(
+    const __m256i& a, const __m256i& a1, __m256i& a2, __m256i& a3,
+    const __m256i& b, const __m256i& b1, __m256i& b2, __m256i& b3,
+    const __m256i& c, const __m256i& c1, __m256i& c2, __m256i& c3,
+    const __m256i& d, const __m256i& d1, __m256i& d2, __m256i& d3) {
+  auto maska = _mm256_cmpgt_epi32 (a, a1);
+  auto maskb = _mm256_cmpgt_epi32 (b, b1);
+  auto maskc = _mm256_cmpgt_epi32 (c, c1);
+  auto maskd = _mm256_cmpgt_epi32 (d, d1);
+
+  maska = _mm256_shuffle_epi32(maska, 0xA0);
+  maskb = _mm256_shuffle_epi32(maskb, 0xA0);
+  maskc = _mm256_shuffle_epi32(maskc, 0xA0);
+  maskd = _mm256_shuffle_epi32(maskd, 0xA0);
+
+  a2 = _mm256_blendv_epi8(a, a1, maska);
+  b2 = _mm256_blendv_epi8(b, b1, maskb);
+  c2 = _mm256_blendv_epi8(c, c1, maskc);
+  d2 = _mm256_blendv_epi8(d, d1, maskd);
+
+  a3 = _mm256_blendv_epi8(a1, a, maska);
+  b3 = _mm256_blendv_epi8(b1, b, maskb);
+  c3 = _mm256_blendv_epi8(c1, c, maskc);
+  d3 = _mm256_blendv_epi8(d1, d, maskd);
+}
+
 inline void minmax(__m256i& a, __m256i& b) {
   auto mask = _mm256_cmpgt_epi32 (a, b);
   mask = _mm256_shuffle_epi32(mask, 0xA0);
@@ -105,10 +143,7 @@ void intra_register_sort(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
   b1 = _mm256_permute4x64_epi64(b, 0x4e);
   c1 = _mm256_permute4x64_epi64(c, 0x4e);
   d1 = _mm256_permute4x64_epi64(d, 0x4e);
-  minmax(a, a1, a2, a3);
-  minmax(b, b1, b2, b3);
-  minmax(c, c1, c2, c3);
-  minmax(d, d1, d2, d3);
+  minmax(a, a1, a2, a3, b, b1, b2, b3, c, c1, c2, c3, d, d1, d2, d3);
   // pick top-2 and last-2 64 bit elements from
   // corresponding registers
   a = _mm256_blend_epi32(a2, a3, 0xf0);
@@ -121,10 +156,7 @@ void intra_register_sort(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
   b1 = _mm256_shuffle_epi32(b, 0x4e);
   c1 = _mm256_shuffle_epi32(c, 0x4e);
   d1 = _mm256_shuffle_epi32(d, 0x4e);
-  minmax(a, a1, a2, a3);
-  minmax(b, b1, b2, b3);
-  minmax(c, c1, c2, c3);
-  minmax(d, d1, d2, d3);
+  minmax(a, a1, a2, a3, b, b1, b2, b3, c, c1, c2, c3, d, d1, d2, d3);
 
   // pick alternate elements from registers
   a = _mm256_blend_epi32(a2, a3, 0xcc);
@@ -140,12 +172,10 @@ void bitonic_merge(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
   // 8-by-8 minmax
   auto cr = reverse(c);
   auto dr = reverse(d);
-  minmax(a, dr, a1, c1);
-  minmax(b, cr, b1, d1);
+  minmax(a, dr, a1, c1, b, cr, b1, d1);
 
   // 4-by-4 minmax
-  minmax(a1, b1, a, b);
-  minmax(c1, d1, c, d);
+  minmax(a1, b1, a, b, c1, d1, c, d);
 
   // intra-register minmax
   intra_register_sort(a, b, c, d);
