@@ -143,7 +143,11 @@ inline void intra_register_sort(__m256i& a, __m256i& b, __m256i& c, __m256i& d) 
   b1 = _mm256_permute4x64_epi64(b, 0x4e);
   c1 = _mm256_permute4x64_epi64(c, 0x4e);
   d1 = _mm256_permute4x64_epi64(d, 0x4e);
-  minmax(a, a1, a2, a3, b, b1, b2, b3, c, c1, c2, c3, d, d1, d2, d3);
+  minmax(a, a1, a2, a3);
+  minmax(b, b1, b2, b3);
+  minmax(c, c1, c2, c3);
+  minmax(d, d1, d2, d3);
+
   // pick top-2 and last-2 64 bit elements from
   // corresponding registers
   a = _mm256_blend_epi32(a2, a3, 0xf0);
@@ -172,10 +176,12 @@ inline void bitonic_merge(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
   // 8-by-8 minmax
   auto cr = reverse(c);
   auto dr = reverse(d);
-  minmax(a, dr, a1, c1, b, cr, b1, d1);
+  minmax(a, dr, a1, c1);
+  minmax(b, cr, b1, d1);
 
   // 4-by-4 minmax
-  minmax(a1, b1, a, b, c1, d1, c, d);
+  minmax(a1, b1, a, b);
+  minmax(c1, d1, c, d);
 
   // intra-register minmax
   intra_register_sort(a, b, c, d);
