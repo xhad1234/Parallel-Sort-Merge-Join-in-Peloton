@@ -103,7 +103,7 @@ inline void transpose8_64i(__m256i *rows) {
 
 }
 
-void sort_columns_64i(__m256i& row0, __m256i& row1,
+inline void sort_columns_64i(__m256i& row0, __m256i& row1,
                       __m256i& row2, __m256i& row3) {
   minmax(row0,row1);
   minmax(row2,row3);
@@ -112,7 +112,7 @@ void sort_columns_64i(__m256i& row0, __m256i& row1,
   minmax(row1,row2);
 }
 
-void merge8_64i(__m256i *rows) {
+inline void merge8_64i(__m256i *rows) {
   minmax(rows[0], rows[4]);
   minmax(rows[1], rows[5]);
   minmax(rows[2], rows[6]);
@@ -127,7 +127,7 @@ void merge8_64i(__m256i *rows) {
 }
 
 
-void sort32_64i(__m256i *rows) {
+inline void sort32_64i(__m256i *rows) {
   sort_columns_64i(rows[0], rows[1], rows[2], rows[3]);
   sort_columns_64i(rows[4], rows[5], rows[6], rows[7]);
 
@@ -135,7 +135,7 @@ void sort32_64i(__m256i *rows) {
   transpose8_64i(rows);
 }
 
-void intra_register_sort(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
+inline void intra_register_sort(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
   __m256i a1, a2, a3, b1, b2, b3, c1, c2, c3, d1, d2, d3;
 
   // 2-by-2 merge
@@ -167,7 +167,7 @@ void intra_register_sort(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
 
 
 // 8-by-8 merge
-void bitonic_merge(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
+inline void bitonic_merge(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
   __m256i a1, b1, c1, d1;
   // 8-by-8 minmax
   auto cr = reverse(c);
