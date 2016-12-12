@@ -97,21 +97,40 @@ void sort32_64i(__m256i *rows) {
   transpose8_64i(rows);
 }
 
-void intra_register_sort(__m256i& a) {
-  __m256i b, c, d;
+void intra_register_sort(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
+  __m256i a1, a2, a3, b1, b2, b3, c1, c2, c3, d1, d2, d3;
 
   // 2-by-2 merge
-  b = _mm256_permute4x64_epi64(a, 0x4e);
-  minmax(a, b, c, d);
+  a1 = _mm256_permute4x64_epi64(a, 0x4e);
+  b1 = _mm256_permute4x64_epi64(b, 0x4e);
+  c1 = _mm256_permute4x64_epi64(c, 0x4e);
+  d1 = _mm256_permute4x64_epi64(d, 0x4e);
+  minmax(a, a1, a2, a3);
+  minmax(b, b1, b2, b3);
+  minmax(c, c1, c2, c3);
+  minmax(d, d1, d2, d3);
   // pick top-2 and last-2 64 bit elements from
   // corresponding registers
-  a = _mm256_blend_epi32(c, d, 0xf0);
+  a = _mm256_blend_epi32(a2, a3, 0xf0);
+  b = _mm256_blend_epi32(b2, b3, 0xf0);
+  c = _mm256_blend_epi32(c2, c3, 0xf0);
+  d = _mm256_blend_epi32(d2, d3, 0xf0);
 
   // 1-by-1 merge
-  b = _mm256_shuffle_epi32(a, 0x4e);
-  minmax(a, b, c, d);
+  a1 = _mm256_shuffle_epi32(a, 0x4e);
+  b1 = _mm256_shuffle_epi32(b, 0x4e);
+  c1 = _mm256_shuffle_epi32(c, 0x4e);
+  d1 = _mm256_shuffle_epi32(d, 0x4e);
+  minmax(a, a1, a2, a3);
+  minmax(b, b1, b2, b3);
+  minmax(c, c1, c2, c3);
+  minmax(d, d1, d2, d3);
+
   // pick alternate elements from registers
-  a = _mm256_blend_epi32(c, d, 0xcc);
+  a = _mm256_blend_epi32(a2, a3, 0xcc);
+  b = _mm256_blend_epi32(b2, b3, 0xcc);
+  c = _mm256_blend_epi32(c2, c3, 0xcc);
+  d = _mm256_blend_epi32(d2, d3, 0xcc);
 }
 
 
@@ -129,10 +148,7 @@ void bitonic_merge(__m256i& a, __m256i& b, __m256i& c, __m256i& d) {
   minmax(c1, d1, c, d);
 
   // intra-register minmax
-  intra_register_sort(a);
-  intra_register_sort(b);
-  intra_register_sort(c);
-  intra_register_sort(d);
+  intra_register_sort(a, b, c, d);
 }
 
 // the two input arrays are a[start, mid] and a[mid+1, end]
