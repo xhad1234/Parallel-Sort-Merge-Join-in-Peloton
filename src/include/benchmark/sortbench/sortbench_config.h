@@ -23,11 +23,11 @@
 
 #define SORTBENCH_DB_NAME "sortbench_db"
 
-#define INSERT_SIZE 100000
+#define INSERT_SIZE 1000
 
 #define LEFT_TABLE_SIZE 100000
 
-#define RIGHT_TABLE_SIZE 100000
+#define RIGHT_TABLE_SIZE 1000
 
 namespace peloton {
 namespace benchmark {
@@ -51,11 +51,7 @@ public:
   // use a read only transaction for the sort-merge join
   bool read_only_txn;
 
-  // partition the left table by the join key
-  bool partition_left;
-
-  // partition the right table by the join key
-  bool partition_right;
+  bool use_avx2_sort;
 
   // time of the sort-merge join in milliseconds
   long execution_time_ms = 0;

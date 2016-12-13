@@ -194,8 +194,9 @@ void LoadSortBenchDatabase() {
 
     if ((tuple_id + 1) % INSERT_SIZE == 0) {
       LoadHelper(insert_stmt.get());
-      LOG_ERROR("Left Table: Inserted %d out of %d tuples", tuple_id+1,
-                LEFT_TABLE_SIZE*state.scale_factor);    }
+//      LOG_ERROR("Left Table: Inserted %d out of %d tuples", tuple_id+1,
+//                LEFT_TABLE_SIZE*state.scale_factor);
+    }
   }
 
   char *r_col_1 = new char[5]();
@@ -232,8 +233,8 @@ void LoadSortBenchDatabase() {
 
     if ((tuple_id + 1) % INSERT_SIZE == 0) {
       LoadHelper(insert_stmt.get());
-      LOG_ERROR("Right Table: Inserted %d out of %d tuples", tuple_id+1,
-               RIGHT_TABLE_SIZE*state.scale_factor);
+//      LOG_ERROR("Right Table: Inserted %d out of %d tuples", tuple_id+1,
+//               RIGHT_TABLE_SIZE*state.scale_factor);
     }
   }
 

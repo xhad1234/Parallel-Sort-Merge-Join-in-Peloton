@@ -209,6 +209,12 @@ void RunSortMergeJoin() {
   right_order_executor.AddChild(&right_seq_scan_executor);
 
   merge_join_executor.Init();
+
+  if (state.use_avx2_sort == true) {
+    left_order_executor.UseAVX2Sort();
+    right_order_executor.UseAVX2Sort();
+  }
+
   int prev_key = INT_MIN;
 
   auto merge_start = static_cast<double>(

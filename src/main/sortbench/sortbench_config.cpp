@@ -24,13 +24,15 @@ namespace sortbench {
 
 void Usage(FILE *out) {
   fprintf(out,
-          "Command line options : sortbench <options> \n"
-          "   -h --help              :  print help message \n"
-          "   -s --scale_factor      :  # of K tuples (default: 1)\n");
+          "Command line options : orderbench <options> \n"
+              "   -h --help              :  print help message \n"
+              "   -s --scale_factor      :  # of K tuples (default: 1)\n"
+              "   -a --avx2              :  Use AVX2 implementation of sort\n");
 }
 
 static struct option opts[] = {
     {"scale_factor", optional_argument, NULL, 's'},
+    {"avx2", optional_argument, NULL, 'a'},
     {NULL, 0, NULL, 0}};
 
 void ValidateScaleFactor(const configuration &state) {
@@ -45,11 +47,12 @@ void ValidateScaleFactor(const configuration &state) {
 void ParseArguments(int argc, char *argv[], configuration &state) {
   // Default Values
   state.scale_factor = 1;
+  state.use_avx2_sort = false;
 
   // Parse args
   while (1) {
     int idx = 0;
-    int c = getopt_long(argc, argv, "hs:", opts, &idx);
+    int c = getopt_long(argc, argv, "has:", opts, &idx);
 
     if (c == -1) break;
 
@@ -58,12 +61,14 @@ void ParseArguments(int argc, char *argv[], configuration &state) {
         Usage(stderr);
         exit(EXIT_FAILURE);
         break;
-
+      case 'a':
+        state.use_avx2_sort = true;
+        break;
       case 's':
         state.scale_factor = atoi(optarg);
         break;
       default:
-        LOG_ERROR("Unknown option: -%c-", c);
+      LOG_ERROR("Unknown option: -%c-", c);
         Usage(stderr);
         exit(EXIT_FAILURE);
         break;
@@ -78,7 +83,8 @@ void WriteOutput() {
                     std::ios_base::app | std::ios_base::out);
 
   LOG_INFO("----------------------------------------------------------");
-  LOG_INFO("%d :: %ld", state.scale_factor,
+  LOG_INFO("%d %s :: %ldms", state.scale_factor,
+           state.use_avx2_sort ? "AVX2 enabled" : "AVX2 disabled",
            state.execution_time_ms);
 
   out << state.scale_factor << " ";
