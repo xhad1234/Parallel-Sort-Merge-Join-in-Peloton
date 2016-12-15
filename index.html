@@ -1,34 +1,25 @@
 <!DOCTYPE html>
-<html>
+<html lang="en-us">
   <head>
-    <meta charset='utf-8'>
-    <meta http-equiv="X-UA-Compatible" content="chrome=1">
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
+    <meta charset="UTF-8">
+    <title>Speed up Sort in Peloton using AVX2 by xhad1234</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
     <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
     <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
-    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
-
-    <!--[if lt IE 9]>
-    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
-    <![endif]-->
-
-    <title>Parallel Sort Merge Join in Peloton by xhad1234</title>
   </head>
-
   <body>
-    <header>
-      <div class="inner">
-        <h1>Parallel Sort Merge Join in Peloton</h1>
-        <h2>The Self-Driving Database Management System</h2>
-        <a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton" class="button"><small>View project on</small> GitHub</a>
-      </div>
-    </header>
+    <section class="page-header">
+      <h1 class="project-name">Speed up Sort in Peloton using AVX2</h1>
+      <h2 class="project-tagline">The Self-Driving Database Management System</h2>
+      <a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton" class="btn">View on GitHub</a>
+      <a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
 
-    <div id="content-wrapper">
-      <div class="inner clearfix">
-        <section id="main-content">
-          <p>We also have a independent repository for the SIMD sort independently: <a href="https://github.com/sid1607/avx2-merge-sort">avx2-merge-sort</a></p>
+    <section class="main-content">
+      <p>We also have a independent repository for the SIMD sort independently: <a href="https://github.com/sid1607/avx2-merge-sort">avx2-merge-sort</a></p>
 
 <hr>
 
@@ -180,8 +171,8 @@
 </tbody>
 </table>
 
-<h2>
-<a id="work-completed" class="anchor" href="#work-completed" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Work Completed</h2>
+<h1>
+<a id="design-and-implementation" class="anchor" href="#design-and-implementation" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Design and Implementation</h1>
 
 <h3>
 <a id="sequential-merge-sort-join" class="anchor" href="#sequential-merge-sort-join" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Sequential Merge-Sort Join</h3>
@@ -198,6 +189,55 @@
 <p>In sorting phase, we use a hard-coded sorting network to perform sort on fixed numbers of values in parallel. A common case of sorting network is the 5-comparisons network for 4 * 4 elements sorting. In our implementation, the register size of avx2 could be 256 bit, thus can hold 8 elements, thus we utilized the Bose-Nelson Algorithm which sorts 8 * 8 elements in parallel. The algorithm is shown as the picture and it has 19 comparator and 7 rounds. we perform the following steps.</p>
 
 <p>The sorting network we implement is shown in Figure 1. The horizontal wires represent data flow (from left side to right side). While the vertical wires represent minmax comparator which put smaller data to the upper line and larger data to the lower line. Each row of the red boxes in the picture represents a register with 8 elements inside. Before the sorting phase, we divide input data into 8*8 matrices and put them into 8 avx2 registers as the input of the sorting network. The 8 column of the input matrix will go through the sorting network concurrently, and produce 8 sorted column in the output registers.</p>
+
+<h3></h3>
+
+<p>After the sorting network, we get 8 sorted columns. However, we need 8 sorted array stored respectively in 8 avx2 registers to conduct next phase. Thus we need to transpose the result matrix so as each input line of size 8 is sorted. The idea to implement transpose method is to interleave two adjacent matrix row first, and then shuffle to pick the candidate elements for each row. Take a 4*4 matrix {{1,2,3,4},{5,6,7,8},{9,10,11,12},{13,14,15,16}} as an example, after the interaction of (row0, row1) and (row2,row3), the matrix would become {{1,5,2,6}, {3,7,4,8},{9,13,10,14},{11,15,12,16}}. Then we use shuffle to pick the {1,3,5,7} from {1,5,2,6} and {3,7,4,8}, we can get the first result row. The following rows can be generated in the same way.</p>
+
+<p>For 8*8 matrix, we first use interleave to combine each two adjacent elements in the same column together. In the second step, we use shuffle to combine two result lines of interleaving and gather 4 elements of a same line in one register. In the final step we call shuffle again and transpose each column to rows.</p>
+
+<p>\noindent
+\begin{minipage}[t]{.47\textwidth}
+\raggedright
+\begin{algorithm}[H]
+\caption{4<em>4 Matrix Transpose Network}
+\SetKwRepeat{Do}{do}{while}
+ \KwData{4</em>4 Matrix sorted in column (each row represented by a register, namely r0-r3 }
+ \KwResult{4 sorted array in register row}
+   t0 \leftarrow interleave_first(r0, r1)\
+   t1 \leftarrow interleave_first(r0, r1)\
+   t2 \leftarrow interleave_first(r2, r3)\
+   t3 \leftarrow interleave_first(r2, r3)\</p>
+
+<pre><code>a \leftarrow shuffle&lt;0, 1, 4, 5&gt;(x, z)\\
+b \leftarrow shuffle&lt;2, 3, 6, 7&gt;(x, z)\\
+c \leftarrow shuffle&lt;0, 1, 4, 5&gt;(y, w)\\
+d \leftarrow shuffle&lt;2, 3, 6, 7&gt;(y, w)\\
+</code></pre>
+
+<p>\label{algo:transpose}
+\end{algorithm}
+\end{minipage}% &lt;-- Don't forget this one
+%
+\hfill
+%
+\begin{minipage}[t]{.5\textwidth}
+\raggedleft
+\begin{center}
+\begin{tabular}{ |P{5.25cm}|P{0.95cm}|P{0.75cm}| } 
+ \hline
+ Instruction &amp; Cycles &amp; TPut\
+ \hline
+ _mm256_unpacklo_ps  &amp; 1 &amp; 1 \
+ _mm256_unpackhi_ps &amp; 1 &amp; 1 \
+ _mm256_shuffle_ps &amp; 1 &amp; 1 \
+ _mm256_permute2f128_ps &amp; 3 &amp; 1 \
+ \hline
+\end{tabular}
+\captionof{table}{AVX2 rearranging instructions used for Bitonic Merge}
+\label{tab:inst}
+\end{center}
+\end{minipage}</p>
 
 <h3>
 <a id="bitonic-sort" class="anchor" href="#bitonic-sort" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Bitonic Sort</h3>
@@ -249,24 +289,14 @@ The sorting network gives us runs of 8 sorted integers. The next phase is to ite
 <hr>
 
 <hr>
-        </section>
 
-        <aside id="sidebar">
-          <a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton/zipball/master" class="button">
-            <small>Download</small>
-            .zip file
-          </a>
-          <a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton/tarball/master" class="button">
-            <small>Download</small>
-            .tar.gz file
-          </a>
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton">Speed up Sort in Peloton using AVX2</a> is maintained by <a href="https://github.com/xhad1234">xhad1234</a>.</span>
 
-          <p class="repo-owner"><a href="https://github.com/xhad1234/Parallel-Sort-Merge-Join-in-Peloton"></a> is maintained by <a href="https://github.com/xhad1234">xhad1234</a>.</p>
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
 
-          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
-        </aside>
-      </div>
-    </div>
+    </section>
 
   
   </body>
