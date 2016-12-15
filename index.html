@@ -220,13 +220,39 @@ c → shuffle&lt;0, 1, 4, 5&gt;(y, w)
 d → shuffle&lt;2, 3, 6, 7&gt;(y, w)
 </code></pre>
 
-<p>AVX2 rearranging instructions used for Matrix Transpose
-Instruction | Cycles|TPut
------------ | ---------- | ----------
- _mm256_unpacklo_ps | 1 | 1 
- _mm256_unpackhi_ps | 1 | 1 
- _mm256_shuffle_ps | 1 | 1 
- _mm256_permute2f128_ps | 3 | 1 </p>
+<p>AVX2 rearranging instructions used for Matrix Transpose</p>
+
+<table>
+<thead>
+<tr>
+<th>Instruction</th>
+<th>Cycles</th>
+<th>TPut</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>_mm256_unpacklo_ps</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>_mm256_unpackhi_ps</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>_mm256_shuffle_ps</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>_mm256_permute2f128_ps</td>
+<td>3</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
 
 <h3>
 <a id="bitonic-sort" class="anchor" href="#bitonic-sort" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Bitonic Sort</h3>
@@ -238,18 +264,18 @@ Instruction | Cycles|TPut
 <p></p>
     <img src="images/figure2.png">
 
-The sorting network gives us runs of 8 sorted integers. The next phase is to iteratively merge these sorted runs to produce a globally sorted array of the input elements. THis is achieved using 2 levels of merge. The lowest level (that is expected to entirely fit in L1 cache) is bitonic merge. This phase uses AVX2 intrinsics to vectorize the process of mergeing 2 sorted registers. The algorithm contains the following steps (summarized in figure 1)
+After the sorting phase is completed we receive runs of elements that are locally sorted. These runs need to be merged to eventually produce the globally sorted array. The merge phase goes through multiple iterations - at each phase we merge twice the number of elements than in the preceding phase. We have $O(log n)$ merge phases and each phase makes multiple calls to the Bitonic Merge function, making it the component that directly influences the overall performance of the algorithm. Bitonic merge consists of a collection of min-max and shuffle operations that make it conducive for vectorization. 
 
-<ol>
-<li>Consider 2 sorted input registers A and B. Reverse B.</li>
-<li>Perform min-max with the corresponding elements of each register - the first element of A is compared against the first element of reversed B and so on. This is termed as "Interleaved Minmax" and performs a comparison for all 8 elements. For this reason, this step can be directly implemented using AVX2 min-max instructions.</li>
-<li>After step 2, the bitonic merge algorithm guarantees that all the first 8 elements are smaller than the next 8 elements. The next step is performed separately for each input register. Within each register, the first element is compared against the 5th, second to 6th and so on. 4 comparisons are performed to produce output runs where the first 4 elements are smaller than the next 4 elements. This process of halving the problem size is continued till all elements are sorted.</li>
-<li>Step 3 minmax cannot be direct performed using AVX2 as it does not involve two registers. Instead an "unrolling" approach (as shown in Figure 2) is followed by creating a permutation of the given register and eventually completing step 3/</li>
-</ol>
+<p>A general Bitonic Merge network takes as input two equally-sized sorted arrays. Let us assume that the size of these arrays is 8. The second array is reversed. The corresponding elements of the two arrays are compared to generate two output arrays that have the minimum and maximum vales at each position. By reversing the second array, the algorithm is able to guarantee that at the end of this first min-max pass all the 8 elements in the "min"-array are smaller than all the elements in the "max"-array. In the next step, within each array we find the min and max between the $1^{st}$ and $5^{th}$ element, $2^{nd}$ and $6^{th}$ element and so on. While the previous phase compared against elements that were 8 locations apart, this phase compares elements that are 4 locations apart. We again a create separate array for min and max values as before. After this step, within each array, the first 4 elements are guaranteed to be smaller than the last 4 elements. Further, all the elements in the min-array are still smaller than all the elements in the max array as no data exchange happened between these two arrays since the previous min-max phase completed. We continue recursively to perform smaller range min-max swaps to eventually produce two arrays that store elements in a globally sorted order. This algorithm is guaranteed to complete in $(log_2 n) + 1$ minmax exchanges.</p>
 
-<p>Figure 2 is annotated with the latency of each avx2 instruction used to implement intra-register bitonic merge</p>
+<p>Algorithm 3 illustrates the steps involved in scalar bitonic merge. Implementing this in AVX-2 is not so straightforward. Consider the case of merging two AVX-2 registers. Each register contains 8 packed 32-bit signed integers that are sorted by the sorting network discussed earlier. We can directly apply min-max across these two registers to generate the two output registers ra and rb where all elements in ra are smaller than or equal to all the elements in rb. The subsequent steps of Bitonic merge require sorting within each register. There are no instructions in the AVX-2 instruction set that can directly perform intra-register sort. If we want to use the min-max registers from before, we need two input registers. Hence the strategy followed is to create a shuffled copy of the given register that needs to be sorted. Considering the register ra, a shuffled copy ra' for 4-range compare is created, such that</p>
 
-<p>At the end of bitonic merge we receive two registers with globally sorted elements.</p>
+<blockquote>
+<p>if ra = {a, b, c, d, e, f, g, h}, we first compute -
+min(a,e); max(a,e); min(b,f); max(b,f); min(c,g); max(c,g); min(d,h); max(d,h)</p>
+</blockquote>
+
+<p>then, ra' = {e, f, g, h, a, b, c, d}</p>
 
 <h3>
 <a id="generalized-merge" class="anchor" href="#generalized-merge" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Generalized Merge</h3>
