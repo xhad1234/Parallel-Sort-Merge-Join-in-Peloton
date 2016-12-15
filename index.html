@@ -196,48 +196,29 @@
 
 <p>For 8*8 matrix, we first use interleave to combine each two adjacent elements in the same column together. In the second step, we use shuffle to combine two result lines of interleaving and gather 4 elements of a same line in one register. In the final step we call shuffle again and transpose each column to rows.</p>
 
-<p>\noindent
-\begin{minipage}[t]{.47\textwidth}
-\raggedright
-\begin{algorithm}[H]
-\caption{4<em>4 Matrix Transpose Network}
-\SetKwRepeat{Do}{do}{while}
- \KwData{4</em>4 Matrix sorted in column (each row represented by a register, namely r0-r3 }
- \KwResult{4 sorted array in register row}
-   t0 \leftarrow interleave_first(r0, r1)\
-   t1 \leftarrow interleave_first(r0, r1)\
-   t2 \leftarrow interleave_first(r2, r3)\
-   t3 \leftarrow interleave_first(r2, r3)\</p>
+<pre><code>4*4 Matrix Transpose Network
+input: 4*4 Matrix sorted in column (each row represented by a register, namely r0-r3)
+result: 4 sorted array in register row}
 
-<pre><code>a \leftarrow shuffle&lt;0, 1, 4, 5&gt;(x, z)\\
-b \leftarrow shuffle&lt;2, 3, 6, 7&gt;(x, z)\\
-c \leftarrow shuffle&lt;0, 1, 4, 5&gt;(y, w)\\
-d \leftarrow shuffle&lt;2, 3, 6, 7&gt;(y, w)\\
+t0 → interleave_first(r0, r1)
+t1 → interleave_first(r0, r1)
+t2 → interleave_first(r2, r3)
+t3 → interleave_first(r2, r3)
+
+a → shuffle&lt;0, 1, 4, 5&gt;(x, z)
+b → shuffle&lt;2, 3, 6, 7&gt;(x, z)
+c → shuffle&lt;0, 1, 4, 5&gt;(y, w)
+d → shuffle&lt;2, 3, 6, 7&gt;(y, w)
 </code></pre>
 
-<p>\label{algo:transpose}
-\end{algorithm}
-\end{minipage}% &lt;-- Don't forget this one
-%
-\hfill
-%
-\begin{minipage}[t]{.5\textwidth}
-\raggedleft
-\begin{center}
-\begin{tabular}{ |P{5.25cm}|P{0.95cm}|P{0.75cm}| } 
- \hline
- Instruction &amp; Cycles &amp; TPut\
- \hline
- _mm256_unpacklo_ps  &amp; 1 &amp; 1 \
- _mm256_unpackhi_ps &amp; 1 &amp; 1 \
- _mm256_shuffle_ps &amp; 1 &amp; 1 \
- _mm256_permute2f128_ps &amp; 3 &amp; 1 \
- \hline
-\end{tabular}
-\captionof{table}{AVX2 rearranging instructions used for Bitonic Merge}
-\label{tab:inst}
-\end{center}
-\end{minipage}</p>
+<p>AVX2 rearranging instructions used for Matrix Transpose
+Instruction | Cycles|TPut
+----------- | ---------- | ----------</p>
+
+<p>_mm256_unpacklo_ps | 1 | 1 
+ _mm256_unpackhi_ps | 1 | 1 
+ _mm256_shuffle_ps | 1 | 1 
+ _mm256_permute2f128_ps | 3 | 1 </p>
 
 <h3>
 <a id="bitonic-sort" class="anchor" href="#bitonic-sort" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Bitonic Sort</h3>
