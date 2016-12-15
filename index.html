@@ -38,7 +38,7 @@
 <h2>
 <a id="summary" class="anchor" href="#summary" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Summary</h2>
 
-<p>The objective is to implement the Sort-Merge Join operator into the Peloton in-memory database system made by <a href="https://github.com/cmu-db/peloton">CMUDB</a>. Recent database literature have designed various hardware-aware Sort-Merge join approaches that involve cache-conscious sorting mechanisms and NUMA-aware work decomposition schemes. We will incorporate these designs in the operator we build for Peloton and evaluate the performance gains and hardware utilization that these techniques have to offer.</p>
+<p>We present an efficient implementation and analysis of merge sort with 256-bit AVX2 based on the CMU database project Peloton. The objective is to implement an optimized Merge-Sort operator into the Peloton in-memory database system made by \href{<a href="https://github.com/cmu-db/peloton%7D%7BCMUDB">https://github.com/cmu-db/peloton}{CMUDB</a>}. We divide the sorting towards sort phase and merge phase. For sort phase, we build a sorting network which could sort 64 element in parallel each time and a matrix transpose network to transpose the result for merging. In addition, our algorithm performs an efficient multiway merge utilizing bitonic-merge network. Finally, we incorporate the parallel merge-sort design in the operator we build for Peloton and evaluate the performance gains and utilization that technique offers.</p>
 
 <h2>
 <a id="background" class="anchor" href="#background" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Background</h2>
@@ -53,12 +53,12 @@
 <li><p>The merge phase - this step scans through the sorted runs of the input relations in lock-step and merges a pair of tuples if the join predicate is satisfied. Assuming no duplicate tuples in either relation, merge can be performed in a single pass.</p></li>
 </ul>
 
-<p>The biggest challenger for parallelization is the sort phase since there are a lot of data dependencies in all sorting algorithms. The work done in Oracle and Intel's "Fast Join Implementation on Modern Multi-core CPUS" and  ETH's "new optimization and results for radix hash join" use a cache-conscious approach for the sort phase. These approaches implement merge sort and apply a different implementation for merge sort depending on the level in the memory hierarchy. For register-level and cache-level sorting, these papers claim that using SIMD is important to achieve good speedup and hardware efficiency. The work done in Hyper claims that SIMD-based sorting isn't necessary to achieve good performance and processor scalability for sort-merge join. They propose a NUMA-aware implementation that incurs the partitioning phase to chunk the input relations across NUMA-sockets, produces core-local sorted runs of these chunks and applies the join predicate for each chunk of the first relation against all chunks of the second relation. The rationale for this approach is that complete traversal of the second relation's chunks will not happen for any given first chunk, since they are already sorted. They also state that the memory prefetcher can mask the interconnect latency when sequential access is carried out on non-local sockets. Our project would be focussed towards integrating the key ideas introduced by these approaches - using a SIMD-based low-level sorting implementation and NUMA-aware data partitioning and evaluating the performance and scalability of our implementation as we add these features</p>
+<p>The biggest challenge for parallelization for the sort phase is there are a lot of data dependencies in all sorting algorithms. The work done in Oracle and Intel's "Fast Join Implementation on Modern Multi-core CPUS" and  ETH's "new optimization and results for radix hash join" use a cache-conscious approach for the sort phase. These approaches implement merge sort and apply a different implementation for merge sort depending on the level in the memory hierarchy. For register-level and cache-level sorting, these papers claim that using SIMD is important to achieve good speedup and hardware efficiency. The work done in Hyper claims that SIMD-based sorting isn't necessary to achieve good performance and processor scalability for sort-merge join. They propose a NUMA-aware implementation that incurs the partitioning phase to chunk the input relations across NUMA-sockets, produces core-local sorted runs of these chunks and applies the join predicate for each chunk of the first relation against all chunks of the second relation. The rationale for this approach is that complete traversal of the second relation's chunks will not happen for any given first chunk, since they are already sorted. They also state that the memory prefetcher can mask the interconnect latency when sequential access is carried out on non-local sockets. Our project would be focussed towards integrating the key ideas introduced by these approaches - using a SIMD-based low-level sorting implementation and NUMA-aware data partitioning and evaluating the performance and scalability of our implementation as we add these features</p>
 
 <h2>
 <a id="the-challenge" class="anchor" href="#the-challenge" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>The Challenge</h2>
 
-<p>We will be using AVX2 CPU intrinsics to implement cache-conscious sorting with SIMD. Since AVX2 offers low-level primitives it will be fairly complicated to implement a fully-functioning sorting network. We also need to be careful about the type of AVX2 instructions we use; an implementation with unnecessary calls to gather and scatter can limit the performance of the implementation. The workload involves two large relations that need to be sorted, which inherently comes with a high communication-to-computation ratio, since large tables will certainly not fit a single memory region. Since sorting is an operation that attempts to establish global order across distributed elements, reducing and optimization the communication patterns would be the primary challenge. None of the papers discussed in the previous section have a perfect solution for this. Instead, they rely on data access patterns and instructional similarity in some operations of join to make better utilization of the hardware.</p>
+<p>We use AVX2 CPU intrinsics to implement cache-conscious sorting with SIMD. Since AVX2 offers low-level primitives it could be fairly complicated to implement a fully-functioning sorting network. We also need to be careful about the type of AVX2 instructions we use; an implementation with unnecessary calls to gather and scatter can limit the performance of the implementation. The workload involves large relations that need to be sorted, which inherently comes with a high communication-to-computation ratio, since large tables will certainly not fit a single memory region. Since sorting is an operation that attempts to establish global order across distributed elements, reducing and optimization the communication patterns would be the primary challenge. None of the papers discussed in the previous section have a perfect solution for this. Instead, they rely on data access patterns and instructional similarity in some operations of join to make better utilization of the hardware.</p>
 
 <h2>
 <a id="resource" class="anchor" href="#resource" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Resource</h2>
@@ -129,43 +129,53 @@
 </tr>
 <tr>
 <td>4-1</td>
-<td>(Sid) Support sorting of all elements number</td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji> Support sorting of all elements number</td>
 </tr>
 <tr>
 <td></td>
-<td>(Lei) Micro benchmark on Haswell Machine to compare std vs SIMD sort</td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji> Micro benchmark on Haswell Machine to compare std vs SIMD sort</td>
 </tr>
 <tr>
 <td>4-2</td>
-<td>(Sid) Explore 16*16 bitonic merge</td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji> Explore 16*16 bitonic merge</td>
 </tr>
 <tr>
 <td></td>
-<td>(Lei) Compare with 4-fold network</td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji> Compare with 4-fold network</td>
 </tr>
 <tr>
 <td>5-1</td>
-<td>(Sid) AVX2 compile with Peloton</td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji>AVX2 compile with Peloton</td>
 </tr>
 <tr>
 <td></td>
-<td>(Lei) Merge the SIMD sort in Peloton</td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji> Merge the SIMD sort in Peloton</td>
 </tr>
 <tr>
 <td>5-2</td>
-<td>(Sid &amp; Lei) Figure out how to maintain the reference of tuple</td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji> Figure out how to maintain the reference of tuple</td>
 </tr>
 <tr>
 <td>6-1</td>
-<td>(Sid &amp; Lei) Performance evaluation</td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji> Performance evaluation</td>
 </tr>
 <tr>
 <td></td>
-<td>(Sid &amp; Lei) Non-SIMD vs SIMD sort version in peloton</td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji> Non-SIMD vs SIMD sort version in peloton</td>
 </tr>
 <tr>
 <td>6-2</td>
-<td>Prepare for the document and poster</td>
+<td>
+<g-emoji alias="heavy_check_mark" fallback-src="https://assets-cdn.github.com/images/icons/emoji/unicode/2714.png" ios-version="6.0">✔️</g-emoji>Prepare for the document and poster</td>
 </tr>
 </tbody>
 </table>
