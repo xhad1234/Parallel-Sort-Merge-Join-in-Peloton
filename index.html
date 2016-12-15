@@ -28,7 +28,7 @@
     <div id="content-wrapper">
       <div class="inner clearfix">
         <section id="main-content">
-          <p>Currently we are implementing the SIMD sort. Because it is independent from peloton, we put the current code in a different repository: <a href="https://github.com/sid1607/avx2-merge-sort">avx2-merge-sort</a></p>
+          <p>We also have a independent repository for the SIMD sort independently: <a href="https://github.com/sid1607/avx2-merge-sort">avx2-merge-sort</a></p>
 
 <hr>
 
@@ -192,15 +192,12 @@
 <a id="sorting-network" class="anchor" href="#sorting-network" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Sorting Network</h3>
 
 <p></p>
-    <img src="images/sort64.png">
+    <img src="images/sort-network.png">
 
 
-<p>Sorting networks are designed to perform sorting on fixed numbers of values. The horizontal wires represents data flow. The vertical wires represents comparator which put smaller data to the upper line and larger data to the lower line.  A common case of sorting network is the 5-comparisons network for 4<em>4 elements sorting. In our implementation, the register size of avx2 could be 256 bit, thus can hold 8 elements, thus we utilized the Bose-Nelson Algorithm which sorts 8</em>8 elements in parallel. The algorithm is shown as the picture and it has 19 comparator and 7 rounds. we perform the following steps:</p>
+<p>In sorting phase, we use a hard-coded sorting network to perform sort on fixed numbers of values in parallel. A common case of sorting network is the 5-comparisons network for 4 * 4 elements sorting. In our implementation, the register size of avx2 could be 256 bit, thus can hold 8 elements, thus we utilized the Bose-Nelson Algorithm which sorts 8 * 8 elements in parallel. The algorithm is shown as the picture and it has 19 comparator and 7 rounds. we perform the following steps.</p>
 
-<ol>
-<li>Divide input data into 8*8 matrix and put them into the sorting network.</li>
-<li>Transpose the result matrix so as each input line of size 8 is sorted.</li>
-</ol>
+<p>The sorting network we implement is shown in Figure 1. The horizontal wires represent data flow (from left side to right side). While the vertical wires represent minmax comparator which put smaller data to the upper line and larger data to the lower line. Each row of the red boxes in the picture represents a register with 8 elements inside. Before the sorting phase, we divide input data into 8*8 matrices and put them into 8 avx2 registers as the input of the sorting network. The 8 column of the input matrix will go through the sorting network concurrently, and produce 8 sorted column in the output registers.</p>
 
 <h3>
 <a id="bitonic-sort" class="anchor" href="#bitonic-sort" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Bitonic Sort</h3>
@@ -235,16 +232,6 @@ The sorting network gives us runs of 8 sorted integers. The next phase is to ite
 <li>The process described in (1) is applied by consuming 8 elements at a time from either array to finally produce a sorted array of 16 elements.</li>
 <li>If there are n input elements, generalized merge repeats step 1 and 2 O(log n) times to completely sort the input array.</li>
 </ol>
-
-<h2>
-<a id="process" class="anchor" href="#process" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Process</h2>
-
-<p>The process goes as the plan in proposal. By the end of week three, we have finished the minimum goal: implementation of the logistic of the SIMD version merge-sort. We are now focusing on expanding the functionality and conducting performance tests for our SIMD merge-sort. After that, we will deploy the merge sort in Peloton and reach our major goal. </p>
-
-<h2>
-<a id="poster-session-plan" class="anchor" href="#poster-session-plan" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Poster Session Plan</h2>
-
-<p>We can show a simple demo by performing our merge-sort in peloton. In the meantime, we will use graph and charts to show the performance of our implementation.</p>
 
 <h2>
 <a id="issues" class="anchor" href="#issues" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Issues</h2>
