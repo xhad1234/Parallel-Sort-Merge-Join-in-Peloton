@@ -325,8 +325,7 @@ b7 → pairwise_max(b3[0], b3[1])
 a' → a4 + a5 + a6 + a7
 b' → b4 + b5 + b6 + b7
 
-
-
+//AVX2 Intra Register Sort
 void intra_register_sort(
         __m256i&amp; a) {
     // 4-range compare
@@ -349,24 +348,181 @@ void intra_register_sort(
 }
 </code></pre>
 
+<p>The rest of the Bitonic Merge procedure proceeds in a similar manner of shuffling to align min-max candidates for each phase. While this algorithm enables us to use vectorized instructions, half the comparisons made are redundant. This reflects in the performance that we discuss in the evaluation section later. This intra-register sorting approach is depicted in the figure above. The high-level AVX2 semantics used to implement intra-register sort is shown in "AVX2 Intra Register Sort" above.</p>
+
+<p>The high-level AVX2 instructions used in the implementation are min, max and shuffle. The exact implementation of min and max depends on the input that we are sorting. For 32-bit signed integers, min and max can be implemented using the _mm256_min_epi32 and _mm256_max_epi32 instructions. Shuffles can be implemented using the permute, blend, unpack, shuffle class of instructions. The shuffle class consists of light (typically 1 cycle latency) instructions that can be used to move elements around only within 128-bit lanes of the 256-bit register that they belong to. The unpack class consists of light instructions that take in two registers and interleaves elements. These instructions typically execute in one cycle, as well. The blend class includes instructions that takes in a pair of registers and picks an element either from the first or second register depending on the flags provided. These instruction execute in 1-2 cycles. Finally, the permute instructions can either shuffle elements across 128-bit SIMD lanes or arbitrarily shuffle two 256-bit registers. These instructions are the most expensive class and typically execute in 2-3 cycles. We sparsely use these instructions in our implementation.</p>
+
+<p>The actual instructions used are listed in Table below</p>
+
+<table>
+<thead>
+<tr>
+<th>Instruction</th>
+<th>Cycles</th>
+<th>TPut</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>_mm256_unpacklo_ps</td>
+<td>1</td>
+<td>1</td>
+</tr>
+</tbody>
+</table>
+
+<p>_mm256_unpackhi_ps | 1 | 1 
+_mm256_shuffle_ps | 1 | 1 
+_mm256_shuffle_epi32 | 1 | 1 
+_mm256_blend_epi32 | 1 | 0.33 
+_mm256_permute2f128_ps | 3 | 1 
+_mm256_permutevar8x32_epi32 | 3 | - </p>
+
 <h3>
-<a id="generalized-merge" class="anchor" href="#generalized-merge" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Generalized Merge</h3>
+<a id="merge-phase" class="anchor" href="#merge-phase" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Merge Phase</h3>
 
-<p>From the previous phase, bitonic merge can be directly applied to obtain runs of 16 elements that are sorted. Further levels of merge build up on 8-by-8 bitonic merge to completely sort the array. For instance, to merge 2 sorted 16 elements arrays, we perform the following steps -</p>
+<p>We cannot increase the size of our bitonic merge network as we increase the merge-sizes. This
+is mainly because the complexity of the network increases in a super-linear fashion as the input
+sizes increase. For this reason, we perform higher-order merges in units of bitonic merge, as
+illustrated by Algorithm 3. This algorithm follows the iterator model, wherein, it loads a vector
+amount of data at a time. The next chunk function abstracts out the pointer arithmetic associated
+with loading the next vector of data to be used by AVX-2. Similarly, store chunk abstracts out
+the pointer arithmetic associated with storing a vector of data into the output buer. When we
+merge two registers, we are guaranteed that the lower half of the output elements are the smallest
+elements available at that instant of execution. However, there is no guarantee that the larger half
+is the second-smallest set of elements that are presently available. We need to load the next chunk
+of data to nd the next smallest sequence. Since we have two sources to load from viz. a and b, we
+pick that source which has the smallest element at the current iterator position. The next chunk
+is loaded into ra and we apply the next iteration of bitonic merge. The standard merge algorithm
+comes with edge cases associated with consuming the remainder elements of an unnished input
+array, which can be implemented in a similar manner to the core design that is explained here.</p>
 
-<ol>
-<li> Apply Bitonic merge for the first 8 elements of the two input arrays. This outputs 2 registers where the first register (A) has sorted elements that are all smaller than the elements of the second sorted register (B). We store the contents of A into the output buffer. We then load in the next elements from the array which has the smaller element at the current pointer position and compare it against B.</li>
-<li>The process described in (1) is applied by consuming 8 elements at a time from either array to finally produce a sorted array of 16 elements.</li>
-<li>If there are n input elements, generalized merge repeats step 1 and 2 O(log n) times to completely sort the input array.</li>
-</ol>
+<pre><code>Higher-order Merge - Merge Sort
+Data: Two locally sorted arrays of equal length - a and b
+Result:Single globally sorted array - out
+ra \leftarrow avx2\_load(next_chunk(a))
+rb \leftarrow avx2\_load(next_chunk(b))
+Do {
+  bitonic_merge(ra, rb)
+  store_chunk(out, avx2_store(ra))
+  If (curr_ele(a) &lt; curr_ele(b)) {
+    ra → avx2_load(next_chunk(a))
+  }
+  else {
+    ra → avx2_load(next_chunk(b))
+  }
+} while(a or b has no more elements)
+Handle merge "edge-cases" in a similar manner
+</code></pre>
 
-<h2>
-<a id="issues" class="anchor" href="#issues" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Issues</h2>
+<p>We had multiple implementations prior to this implementation that used a different set of (less efficient) AVX-2 instructions to perform the same task. The implementation discussed here is the best one we were able to achieve, in terms of performance.</p>
+
+<h3>
+<a id="integration-into-peloton" class="anchor" href="#integration-into-peloton" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Integration into Peloton</h3>
+
+<p>The sub-sections so far discuss the building blocks of the basic implementation for vectorized merge-
+sort with 32-bit signed integers. Databases oer the ORDER BY query to sort a table based on a
+column or set of columns and perform subsequent operations like join, over the sorted table. Our
+goal is to integrate this implementation into Peloton and execute this implementation when a query
+to sort a single column of integer data type is received.</p>
+
+<p>When the ORDER BY query is sent by a client, Peloton parses the query into a query plan-tree that
+embeds the sequence of operations along with the data arguments required to execute the query.
+The plan-tree is handed over to the executors that traverse the plan-tree and dynamically invoke
+the appropriate executor that has the execution logic necessary to execute a given plan node. The
+OrderByExecutor in Peloton identies the columns to be sorted and creates a new structure for
+every tuple that stores a pointer to the tuple and its block-oset coordinates in the storage layer.
+It then deploys C++ STL sort and physically materializes the results.</p>
+
+<p>Over and above sorting 32-bit integer keys, we now need to extend our AVX-2 sort implementation
+to maintain a reference to the tuple that it belonged to. The work done in [?] discusses two
+approaches two accomplish this task</p>
 
 <ul>
-<li>Peloton uses tuple to store data, we need to figure out how to maintain the reference of tuple while doing sort.</li>
-<li>Currently our methods only support array lengths which are times of 64</li>
+<li>The first approach is to maintain two separate arrays of 32-bit elements. The first array stores all the sorting keys. The standard minmax and shuffle steps are performed here. The second array stores the pointers to the corresponding tuples. We don't actually apply the minmax operations to this array, but we mirror all the shuffles and other data movement that occurs in the key array. We now require a mask from the min-max operation, so that we can mirror data movement caused due to minmax on the tuple-pointer array. Hence, we had to substitute the low latency avx2 min and max instructions with a low latency compare and four medium-latency blends. The rationale for this approach is that we double the number of instructions, but, complete effective work for 8 elements at a time. </li>
+<li>The second approach is to bunch the key and tuple pointer together into a 64-bit composte element. We want the min-max operations to only be influenced by the key and not the tuple pointer.,By storing the key in the upper 32 bits we can ensure this. However, the AVX-2 intrinsics do not offer a 64-bit minmax instruction. Due to this, we had to implement a mask-based minmax function even for this implementation. The rationale for this implementation is that we require a fewer number of instructions. </li>
 </ul>
+
+<p>While Peloton has 64-bit tuple pointers, we assume that the table can be indexed with 32-bit pointers to simplify the AVX-2 implementation. We modified the OrderBy Executor to use our AVX-2 sort when all the constraints (single sorting column, 32-bit int keys, table has at the most $2^{32}$ tuples) are met.</p>
+
+<h1>
+<a id="evaluation" class="anchor" href="#evaluation" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Evaluation</h1>
+
+<p>The first set of experiments we deploy are intended to directly benchmark our AVX-2 sort implementation against C++ STL Sort. The simple benchmark populates an array with randomly generated signed integers. We sort the same array with STL sort and our sort and compare the execution times.</p>
+
+<h3>
+<a id="evaluation-setup" class="anchor" href="#evaluation-setup" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Evaluation Setup</h3>
+
+<p>We use PDL cluster as the evaluation machine. The Processor of PDL node is Intel(R) Xeon(R) CPU E5-2620 v3 @ 2.40GHz with Haswell microarchitecture. Each of the node has 12 cores and 2 threads per core. The memory size is 260GB and L3 cache size is 15MB. We implement a micro benchmark to test the throughput of sorting random-generated input array of different size. For the speed of Peloton's executor, we developed a microbenchmark that loads a table and evaluates the OrderByExecutor. </p>
+
+<h3>
+<a id="32-bit-sort-implementation" class="anchor" href="#32-bit-sort-implementation" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>32-bit sort implementation</h3>
+
+<p>In this benchmark we scale the input size from 8000 elements to a Billion elements. Our initial implementation didn't show good performance improvement over STL sort - with 8k elements we were approximately 2 times faster, while we were 0.9x slower with 1 Billion elements. To this implementation we added the following optimizations:</p>
+
+<ul>
+<li>Better code arrangement - We inlined more functions, unrolled some loops and opened up some functions to issue more of the same instructions with different registers to exploit instruction-level parallelsim to the best possible extent</li>
+<li>Aligned loads - We initially used _mm256_maskload_epi32 to load data located at any arbitrary address into registers. However, this turned out to be one of the bottlenecks in our implementation and discovered that AVX-2 performs better with aligned loads. Specifically, the data needs to be 32B aligned to avoid maskload. The simples way to guarantee aligned loads is to have the first element in the input array allocated on a 32B-aligned address and pad the array to ensure that its length is always a multiple of 8. Using posix_memalign() we can perform 32B-aligned memory allocation and pad the array to round to the nearest multiple of 8.</li>
+</ul>
+
+<p></p>
+    <img src="images/32bit.png">
+
+
+<p>After adding these two optimizations, the performance of our AVX-2 sort significantly improved. With 8k elemnts we observeed a 4.5 times speedup over STL sort. We are 2 times faster than STL sort even with a billion elements. As the input size increases we start getting memory-bandwidth bound. This explains why there is a decay in the performance.</p>
+
+<p>We used the Intel Architecture Code Analyzer (IACA) tool to profile our Bitonic merge implementation (since majority of the execution time is spent on it). We found that 18.45 cycles are required to execute this block on a Haswell Processor, which corresponds to 1.15 cycle per element. We also observed tht even heavier instructions like permutes were able to complete in 1 cycle through pipelining. The main bottleneck for throughput was found to be "InterIteration" which indicates inter-loop dependencies that we can't avoid.</p>
+
+<h3>
+<a id="the-two-vector-approach" class="anchor" href="#the-two-vector-approach" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>The Two-Vector Approach</h3>
+
+<p>Once we optimized our 32-bit sort implementation our next goal was to find a way to track database tuples along with the sorting keys. This subs-ection evaluates the first of the two approaches discussed earlier. Based on the work done in existing literature, we didn't expect more than a 2 times slowdown from the 32-bit implementation. However, as the figure below shows, we got worse than 2x slowdown with this implementation. We suspected that this issue was due to the heavier minmax computations and doubled volume of shuffle instructions. We expected minmax to have a less adverse impact on the performance compared to increased shuffles, since we expected the blendv instructions in minmax to get pipelined. To validate this hypothesis, we made two new versions of the 2 vector approach. The first kept the increased number of shuffle instructions but reverted to the AVX-2 minmax instructions. The second kept the mask-based minmax and discarded the shuffles for the tuple-offset array. Note that these versions do not generate correct result - they were purely meant to diagnose our performance issues. As Figure figure below shows, we get an almost similar improvement in performance when either feature is discarded. This was counter-intuitive as the raw number instructions used to implement shuffles exceed the the raw number of instructions used to implement minmax. </p>
+
+<p></p>
+    <img src="images/2vec.png">
+
+
+<p>Profiling with IACA showed that Bitonic merge now required 76 cycles - which is a 4x slow down compared to the 32-bit implementation. Against our expectations, we found that the blendv instructions don't get pipelined. This is because they all require a specific hardware unit (referred to as "Port 5" in the trace) to execute. Each blendv instruction consumes 2 cycles. Since minmax is invoked 4-times in 8-by-8 Bitonic merge, this 9-cycle minmax contributes 36 cycles (around 50\% of the cycles) in Bitonic merge. 74\% of the cycles are spent on Port 5 - as many other AVX-2 instructions depend on it. Hence, it was identified as the chief bottleneck in the implementation.</p>
+
+<h3>
+<a id="the-64-bit-approach" class="anchor" href="#the-64-bit-approach" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>The 64-bit approach</h3>
+
+<p></p>
+    <img src="images/64bit.png">
+
+The other approach that we dicussed earlier is to group the sorting key and its tuple offset pointer together as a 64-bit element. Unlike the two vector approach, we do not need to double the number of instructions within one loop of bitonic merge. However, the effective throughput of these instructions are halved as they only yield half the number of elements per call. 
+
+<p>Further, the AVX-2 intrinsics do not provide any instructions for 64-bit minmax. This required us to use mask-based minmax and it gives us a similar performance penalty to that discussed in the two-vector approach. Since each register can now pack only 4 elements at a time, our bitonic merge network requires slightly fewer shuffle instructions than our original 32-bit implementation. Despite this we expect a similar slowdown to the 2 vector approach, since it uses the mask-based minmax. We integrated this implementation into the OrderByExecutor of Peloton and evaluated it by developing a microbenchmark in Peloton that loads the workload into the tablea nd sorts it using STL sort and our sort implementation. We vary the table size from 100k tuples to 100 Million tuples.  </p>
+
+<p>The figure shows that our AVX-2 sort implementation is able to achieve a 10-20\% speedup over STL sort and a 2x speedup over qsort(). Furthermore, our performance gains do not decrease as we scale the number of tuples as we were able to optimize loads and stores in Peloton and reduce the dependence of the implementation on memory bandwidth.</p>
+
+<h3>
+<a id="effect-of-bitonic-merge-network-width" class="anchor" href="#effect-of-bitonic-merge-network-width" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Effect of Bitonic Merge Network Width</h3>
+
+<p></p>
+    <img src="images/sort-width.png">
+
+
+<p>Finally, we wanted to evaluate the impact on performance that the width of the Bitonic merge network has. Width of the network is defined in terms of the size of input vectors being merged. A 4-width network merges two sorted arrays that have 4 elements each, the 8-width network merges two sorted arrays that have 8 elements each, etc. We evaluate this using the 64-bit implementation using the same microbenchmark that was mentioned in the previous sub-section. The wider the network, the more complex its implementation becomes (in-terms of the number of minmax and shuffle instructions required to complete the merge). In Figure above we plot the relative performance (in terms of execution time) for 4, 8 and 16 width networks. A 4-width network has the least relative performance primarily because the hardware is underutilized. The 8-width network has the best relative performance. While the 16-width network has better utilization of the hardware than the 4-width case, the increased complexity in the network results in slower performance relative to the 8-width network.</p>
+
+<h1>
+<a id="findings-and-conclusion" class="anchor" href="#findings-and-conclusion" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Findings and Conclusion</h1>
+
+<h3>
+<a id="findings" class="anchor" href="#findings" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Findings</h3>
+
+<p>To summarize all the surprising findings we had mentioned through the report:</p>
+
+<ul>
+<li>AVX-2 does not offer an instruction to find the min and max amongst two registers populated with 64-bit elements. This directly affected the performance we could achieve with sort.</li>
+<li>Certain instructions like blends and shuffles can only be executed by one hardware unit (on a Haswell processor). This unit becomes a significant bottleneck, especially when the core minmax implementation uses these instructions.</li>
+<li>Good scheduling of instructions along with aligned loads offer significant performance benefits for AVX-2</li>
+</ul>
+
+<h3>
+<a id="conclusion" class="anchor" href="#conclusion" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Conclusion</h3>
+
+<p>Through our experiences of working with AVX-2 in this project we can conclude that a well-written AVX-2 merge-sort implementation that is bandwidth-oblivious can potentially gain a 3-4x speedup over C++ STL Sort. However, it is inevitable to take a performance penalty when the keys are sorted for a table in a database. While STL sort is bottle-necked by the comparator function, AVX-2 merge sort is bottlenecked by the number of elements that can be sorted in a data-parallel manner for a fixed number of instructions. For this reason, there is no decay in performance from 32-bit to 64-bit sort for STL's implementation. If the AVX-2 instruction set did contain 64-bit min-max instructions we project that our implementation can achieve a 1.5x-2x speedup when deployed in the OrderByExecutor. Increasing the width of a sorting network isn't the right way to go to improve the performance of this implementation. Using bandwidth-oblivious techniques like single-threaded multiway-merge through FIFO queues is the way to overcome bottlenecks due to the memory bandwidth.</p>
 
 <h2>
 <a id="authors-and-contributors" class="anchor" href="#authors-and-contributors" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Authors and Contributors</h2>
