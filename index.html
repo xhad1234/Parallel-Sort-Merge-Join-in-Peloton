@@ -298,6 +298,34 @@ max(a,e), max(b,f), max(c,g), max(d,h)}
 
 <p>We use an additional shuffle instruction that accepts two registers as input, discards half the elements, shuffles the remaining half to output the new 8 element register.</p>
 
+<pre><code>Scalar 4-by-4 Bitonic Merge Network
+Input:  Two locally sorted 4-element arrays - a and b}
+Result: Two globally sorted 4-element arrays - a' and b'}
+\\4-range comparison
+br → reverse(b)
+a1 → pairwise_min(a, br)
+b1 → pairwise_max(a, br)
+
+\\2-range comparison
+a2 → pairwise_min(a1[:2], a1[2:])
+a3 → pairwise_max(a1[:2], a1[2:])
+b2 → pairwise_min(b1[:2], b1[2:])
+b3 → pairwise_max(b1[:2], b1[2:])
+
+\\1-range comparison
+a4 → pairwise_min(a2[0], a2[1])
+a5 → pairwise_max(a2[0], a2[1])
+a6 → pairwise_min(a3[0], a3[1])
+a7 → pairwise_max(a3[0], a3[1])
+b4 → pairwise_min(b2[0], b2[1])
+b5 → pairwise_max(b2[0], b2[1])
+b6 → pairwise_min(b3[0], b3[1])
+b7 → pairwise_max(b3[0], b3[1])
+
+a' → a4 + a5 + a6 + a7
+b' → b4 + b5 + b6 + b7
+</code></pre>
+
 <h3>
 <a id="generalized-merge" class="anchor" href="#generalized-merge" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Generalized Merge</h3>
 
