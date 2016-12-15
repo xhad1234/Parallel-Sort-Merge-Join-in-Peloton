@@ -258,16 +258,9 @@ d → shuffle&lt;2, 3, 6, 7&gt;(y, w)
 <h3>
 <a id="bitonic-sort" class="anchor" href="#bitonic-sort" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Bitonic Sort</h3>
 
-<p></p>
-    <img src="images/figure1.png" alt="hi">
+<p>After the sorting phase is completed we receive runs of elements that are locally sorted. These runs need to be merged to eventually produce the globally sorted array. The merge phase goes through multiple iterations - at each phase we merge twice the number of elements than in the preceding phase. We have $O(log n)$ merge phases and each phase makes multiple calls to the Bitonic Merge function, making it the component that directly influences the overall performance of the algorithm. Bitonic merge consists of a collection of min-max and shuffle operations that make it conducive for vectorization. </p>
 
-
-<p></p>
-    <img src="images/figure2.png">
-
-After the sorting phase is completed we receive runs of elements that are locally sorted. These runs need to be merged to eventually produce the globally sorted array. The merge phase goes through multiple iterations - at each phase we merge twice the number of elements than in the preceding phase. We have $O(log n)$ merge phases and each phase makes multiple calls to the Bitonic Merge function, making it the component that directly influences the overall performance of the algorithm. Bitonic merge consists of a collection of min-max and shuffle operations that make it conducive for vectorization. 
-
-<p>A general Bitonic Merge network takes as input two equally-sized sorted arrays. Let us assume that the size of these arrays is 8. The second array is reversed. The corresponding elements of the two arrays are compared to generate two output arrays that have the minimum and maximum vales at each position. By reversing the second array, the algorithm is able to guarantee that at the end of this first min-max pass all the 8 elements in the "min"-array are smaller than all the elements in the "max"-array. In the next step, within each array we find the min and max between the $1^{st}$ and $5^{th}$ element, $2^{nd}$ and $6^{th}$ element and so on. While the previous phase compared against elements that were 8 locations apart, this phase compares elements that are 4 locations apart. We again a create separate array for min and max values as before. After this step, within each array, the first 4 elements are guaranteed to be smaller than the last 4 elements. Further, all the elements in the min-array are still smaller than all the elements in the max array as no data exchange happened between these two arrays since the previous min-max phase completed. We continue recursively to perform smaller range min-max swaps to eventually produce two arrays that store elements in a globally sorted order. This algorithm is guaranteed to complete in $(log_2 n) + 1$ minmax exchanges.</p>
+<p>A general Bitonic Merge network takes as input two equally-sized sorted arrays. Let us assume that the size of these arrays is 8. The second array is reversed. The corresponding elements of the two arrays are compared to generate two output arrays that have the minimum and maximum vales at each position. By reversing the second array, the algorithm is able to guarantee that at the end of this first min-max pass all the 8 elements in the "min"-array are smaller than all the elements in the "max"-array. In the next step, within each array we find the min and max between the 1st and 5th element, 2nd and 6th element and so on. While the previous phase compared against elements that were 8 locations apart, this phase compares elements that are 4 locations apart. We again a create separate array for min and max values as before. After this step, within each array, the first 4 elements are guaranteed to be smaller than the last 4 elements. Further, all the elements in the min-array are still smaller than all the elements in the max array as no data exchange happened between these two arrays since the previous min-max phase completed. We continue recursively to perform smaller range min-max swaps to eventually produce two arrays that store elements in a globally sorted order. This algorithm is guaranteed to complete in log2 n + 1 minmax exchanges.</p>
 
 <p>Algorithm 3 illustrates the steps involved in scalar bitonic merge. Implementing this in AVX-2 is not so straightforward. Consider the case of merging two AVX-2 registers. Each register contains 8 packed 32-bit signed integers that are sorted by the sorting network discussed earlier. We can directly apply min-max across these two registers to generate the two output registers ra and rb where all elements in ra are smaller than or equal to all the elements in rb. The subsequent steps of Bitonic merge require sorting within each register. There are no instructions in the AVX-2 instruction set that can directly perform intra-register sort. If we want to use the min-max registers from before, we need two input registers. Hence the strategy followed is to create a shuffled copy of the given register that needs to be sorted. Considering the register ra, a shuffled copy ra' for 4-range compare is created, such that</p>
 
@@ -276,6 +269,34 @@ min(a,e); max(a,e); min(b,f); max(b,f); min(c,g); max(c,g); min(d,h); max(d,h)
 
 then, ra' = {e, f, g, h, a, b, c, d}
 </code></pre>
+
+<p></p>
+    <img src="images/figure1.png" alt="hi">
+
+
+<p></p>
+    <img src="images/figure2.png">
+
+
+<p>We can now apply min-max across (ra, ra'). Since min-max is a commutative function, minmax(a,e) = minmax(e,a). The result we get is -</p>
+
+<pre><code>min({a, b, c, d, e, f, g, h},  {e, f, g, h, a, b, c, d}) 
+= {min(a,e), min(b,f), min(c,g), min(d,h), min(e,a), min(f,b), min(g,c), min(h,d)}
+</code></pre>
+
+<p>The first 4 elements are same as the last 4 elements. Similarly,</p>
+
+<pre><code>max({a, b, c, d, e, f, g, h},  {e, f, g, h, a, b, c, d}) 
+= {max(a,e), max(b,f), max(c,g), max(d,h), max(e,a), max(f,b), max(g,c), max(h,d)}
+</code></pre>
+
+<p>The result that we want for the next step (i.e. 2-range compare) is</p>
+
+<pre><code>new_r = {min(a,e), min(b,f), min(c,g), min(d,h), 
+max(a,e), max(b,f), max(c,g), max(d,h)}
+</code></pre>
+
+<p>We use an additional shuffle instruction that accepts two registers as input, discards half the elements, shuffles the remaining half to output the new 8 element register.</p>
 
 <h3>
 <a id="generalized-merge" class="anchor" href="#generalized-merge" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Generalized Merge</h3>
