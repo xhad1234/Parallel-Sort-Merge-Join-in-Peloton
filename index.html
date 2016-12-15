@@ -199,7 +199,8 @@
 
 <p>The sorting network we implement is shown in Figure 1. The horizontal wires represent data flow (from left side to right side). While the vertical wires represent minmax comparator which put smaller data to the upper line and larger data to the lower line. Each row of the red boxes in the picture represents a register with 8 elements inside. Before the sorting phase, we divide input data into 8*8 matrices and put them into 8 avx2 registers as the input of the sorting network. The 8 column of the input matrix will go through the sorting network concurrently, and produce 8 sorted column in the output registers.</p>
 
-<h3></h3>
+<h3>
+<a id="matrix-transpose" class="anchor" href="#matrix-transpose" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Matrix Transpose</h3>
 
 <p>After the sorting network, we get 8 sorted columns. However, we need 8 sorted array stored respectively in 8 avx2 registers to conduct next phase. Thus we need to transpose the result matrix so as each input line of size 8 is sorted. The idea to implement transpose method is to interleave two adjacent matrix row first, and then shuffle to pick the candidate elements for each row. Take a 4*4 matrix {{1,2,3,4},{5,6,7,8},{9,10,11,12},{13,14,15,16}} as an example, after the interaction of (row0, row1) and (row2,row3), the matrix would become {{1,5,2,6}, {3,7,4,8},{9,13,10,14},{11,15,12,16}}. Then we use shuffle to pick the {1,3,5,7} from {1,5,2,6} and {3,7,4,8}, we can get the first result row. The following rows can be generated in the same way.</p>
 
