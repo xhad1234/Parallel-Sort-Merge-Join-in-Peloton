@@ -270,12 +270,11 @@ After the sorting phase is completed we receive runs of elements that are locall
 
 <p>Algorithm 3 illustrates the steps involved in scalar bitonic merge. Implementing this in AVX-2 is not so straightforward. Consider the case of merging two AVX-2 registers. Each register contains 8 packed 32-bit signed integers that are sorted by the sorting network discussed earlier. We can directly apply min-max across these two registers to generate the two output registers ra and rb where all elements in ra are smaller than or equal to all the elements in rb. The subsequent steps of Bitonic merge require sorting within each register. There are no instructions in the AVX-2 instruction set that can directly perform intra-register sort. If we want to use the min-max registers from before, we need two input registers. Hence the strategy followed is to create a shuffled copy of the given register that needs to be sorted. Considering the register ra, a shuffled copy ra' for 4-range compare is created, such that</p>
 
-<blockquote>
-<p>if ra = {a, b, c, d, e, f, g, h}, we first compute -
-min(a,e); max(a,e); min(b,f); max(b,f); min(c,g); max(c,g); min(d,h); max(d,h)</p>
-</blockquote>
+<pre><code>if ra = {a, b, c, d, e, f, g, h}, we first compute -
+min(a,e); max(a,e); min(b,f); max(b,f); min(c,g); max(c,g); min(d,h); max(d,h)
 
-<p>then, ra' = {e, f, g, h, a, b, c, d}</p>
+then, ra' = {e, f, g, h, a, b, c, d}
+</code></pre>
 
 <h3>
 <a id="generalized-merge" class="anchor" href="#generalized-merge" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Generalized Merge</h3>
