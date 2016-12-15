@@ -324,6 +324,29 @@ b7 → pairwise_max(b3[0], b3[1])
 
 a' → a4 + a5 + a6 + a7
 b' → b4 + b5 + b6 + b7
+
+
+
+void intra_register_sort(
+        __m256i&amp; a) {
+    // 4-range compare
+    a1 = avx2_permute(a);
+    mina = avx2_min(a, a1);
+    maxa = avx2_max(a, a1);
+    a = avx2_blend(mina, maxa);
+
+    // 2-range compare
+    a1 = avx2_shuffle(a);
+    mina = avx2_min(a, a1);
+    maxa = avx2_max(a, a1);
+    a = avx2_unpack(mina, maxa);
+
+    // 1-range compare
+    a1 = avx2_shuffle(a);
+    mina = avx2_min(a, a1);
+    maxa = avx2_max(a, a1);
+    a = avx2_blend(mina, maxa);
+}
 </code></pre>
 
 <h3>
